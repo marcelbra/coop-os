@@ -37,6 +37,8 @@ class AgentOSApp(App[None]):
         self.state: ProjectState | None = None
         self.selected: Nav | None = None
         self.in_detail: bool = False
+        for d in ("context/roles", "milestones", "tasks", "notes"):
+            (root / d).mkdir(parents=True, exist_ok=True)
 
     # ── Layout ────────────────────────────────────────────────────────────────
 
