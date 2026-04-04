@@ -58,12 +58,13 @@ class NavTree(Tree):
             app.action_jump_to_detail()
             event.stop()
         else:
-            # root or section: expand if needed, jump to first child
+            # root or section: expand then move cursor after re-render
+            children = list(node.children)
             if not node.is_expanded:
                 node.expand()
-            children = list(node.children)
             if children:
-                self.move_cursor(children[0])
+                target = children[0]
+                self.app.call_after_refresh(lambda: self.move_cursor(target))
             event.stop()
 
     def _handle_left(self, event: Key) -> None:
