@@ -30,6 +30,3 @@ Triggered by: "check in", "let's check in", "good morning", "morning", "start my
 6. **Open the floor**
    - End with: "What's on your mind?" or "Anything to add before we dive in?"
    - Be ready to shift into any skill: create_task, explore, execute_task, etc.
-
-## Tone
-Energetic but grounded. Like a sharp colleague who already did the prep work.

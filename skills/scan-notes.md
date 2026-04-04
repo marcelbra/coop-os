@@ -2,7 +2,7 @@
 
 Triggered by: `/scan-notes`, "scan my notes", "let's go through my notes", "process my notes"
 
-## What to do
+## Steps
 
 1. **Load unscanned notes**
    - Read all files in `notes/` where `scanned: false`
@@ -28,7 +28,3 @@ Triggered by: `/scan-notes`, "scan my notes", "let's go through my notes", "proc
 
 5. **Mark notes as scanned**
    - For each processed note: PUT /api/notes/{id} with `scanned: true`
-
-## Tone
-
-Direct. Surface the signal, skip the noise. One decision at a time if Marcel wants to go slow.

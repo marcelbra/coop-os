@@ -25,6 +25,3 @@ Triggered by: "check out", "let's check out", "wrap up", "end of day", "signing 
 5. **Close**
    - One sentence on how the day went (honest, not cheerleader)
    - "Rest well." and done.
-
-## Tone
-Calm and efficient. Closing the loop, not dragging it out.

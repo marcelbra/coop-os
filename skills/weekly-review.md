@@ -42,6 +42,3 @@ Best done: Sunday evening or Friday afternoon.
 8. **Close the review**
    - One honest paragraph: what the week actually looked like vs. intention
    - What's the one thing to protect next week?
-
-## Tone
-Honest and reflective. Not a performance review — a calibration.
