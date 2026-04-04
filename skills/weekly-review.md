@@ -1,44 +1,38 @@
-# Weekly Review Routine
+# /weekly-review
 
-Triggered by: "weekly review", "let's do a weekly", "sunday review", "how was my week", "week review"
+Triggered by: `/weekly-review`
 
 Best done: Sunday evening or Friday afternoon.
 
 ## Steps
 
 1. **Task overview**
-   - Run: `backlog overview --plain` (if available) or `backlog task list --plain`
+   - Read all task files in `tasks/`
    - What got done this week? What's been sitting untouched?
-   - Archive anything completed and stale
+   - Flag anything completed that should be archived
 
 2. **Review by role**
-   - Go through each role from `doc-2 - Life-Roles.md`
-   - For each: Did you invest the time budget? Any movement on goals?
-   - Roles: 🧘 Self, 💪 Health, 💕 Partnership, 👨‍👩‍👧 Family, 👥 Social, 💰 Finances, 🛠️ Builder
+   - Go through each file in `context/roles/`
+   - For each role: was time invested? Any movement on goals?
 
 3. **Habits check**
-   - Reference `doc-3 - Recurring-Habits.md`
-   - Ask Marcel to self-report: which habits hit, which missed?
-   - No judgment — just data. Look for patterns.
+   - Check recurring commitments defined in role files
+   - Ask the user to self-report: which habits hit, which missed?
+   - No judgment — just data, look for patterns
 
 4. **Goals progress**
-   - Scan tasks labeled by role — any goals closer to done?
-   - Flag goals that haven't moved in 2+ weeks: still relevant, or should be archived?
+   - Review milestone files in `milestones/`
+   - Flag any that haven't moved in 2+ weeks: still relevant, or archive?
 
-5. **Next Discussions**
-   - Check `doc-4 - Next-Discussions.md`
-   - Is there anything on the list that's now urgent?
-   - Pick 1–2 to discuss this week if time allows
-
-6. **Plan next week**
-   - Check calendar for next week
+5. **Plan next week**
+   - Check calendar for the coming week
    - Agree on top 3 focus areas (not tasks — areas)
    - Set or adjust priorities on relevant tasks
 
-7. **Update docs if needed**
-   - Has anything changed in Marcel's roles, goals, or context?
-   - If yes, update the relevant doc file directly
+6. **Update context if needed**
+   - Has anything changed in roles, goals, or situation?
+   - If yes, update the relevant file in `context/roles/`
 
-8. **Close the review**
+7. **Close the review**
    - One honest paragraph: what the week actually looked like vs. intention
    - What's the one thing to protect next week?

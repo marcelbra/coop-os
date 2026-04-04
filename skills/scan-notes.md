@@ -1,11 +1,11 @@
-# Scan Notes
+# /scan-notes
 
-Triggered by: `/scan-notes`, "scan my notes", "let's go through my notes", "process my notes"
+Triggered by: `/scan-notes`
 
 ## Steps
 
 1. **Load unscanned notes**
-   - Read all files in `notes/` where `scanned: false`
+   - Read all files in `notes/` where frontmatter has `scanned: false`
    - If none found, say so and stop
 
 2. **For each unscanned note**, analyze the content and identify what actions make sense:
@@ -21,10 +21,10 @@ Triggered by: `/scan-notes`, "scan my notes", "let's go through my notes", "proc
 
 4. **Execute approved actions**
    - Create tasks / milestones / update context files as confirmed
-   - Write directly to the appropriate directory using the template files in `templates/`
-   - For tasks: create `tasks/{next_id}-{slug}/description.md`
-   - For milestones: create `milestones/{next_id}-{slug}.md`
-   - For context updates: edit the relevant `context/roles/{id}-{slug}.md`
+   - Use templates from `templates/`
+   - Tasks: `tasks/{next_id}-{slug}/description.md`
+   - Milestones: `milestones/{next_id}-{slug}.md`
+   - Context updates: `context/roles/{id}-{slug}.md`
 
 5. **Mark notes as scanned**
-   - For each processed note: PUT /api/notes/{id} with `scanned: true`
+   - Set `scanned: true` in the frontmatter of each processed note file
