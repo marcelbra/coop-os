@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from typing import cast
@@ -21,10 +22,11 @@ from agent_os.tui.widgets import DetailTextArea, NavTree
 class AgentOSApp(App[None]):
     TITLE = "agent-os"
     CSS = APP_CSS
+    ENABLE_COMMAND_PALETTE = False
 
     BINDINGS = [
-        Binding("n", "new_item", "New"),
-        Binding("d", "delete_item", "Delete"),
+        Binding("n", "new_item", "new", show=False),
+        Binding("d", "delete_item", "delete", show=False),
         Binding("ctrl+m", "toggle_mode", "Mode", show=False),
         Binding("r", "refresh", "Refresh", show=False),
     ]
@@ -69,7 +71,8 @@ class AgentOSApp(App[None]):
         if s.pms:
             ctx.add_leaf(_t("Personal Mission Statement"), data=Nav("pms", "pms", "context"))
         for r in s.roles:
-            ctx.add_leaf(_t(f"{r.emoji} {r.name}"), data=Nav("role", r.id, "context"))
+            emoji = r.emoji.replace("\uFE0F", "").replace("\uFE0E", "")
+            ctx.add_leaf(_t(f"{emoji} {r.name}"), data=Nav("role", r.id, "context"))
 
         _ms_icon = {"active": "●", "completed": "✓", "cancelled": "✗"}
         ms_node = tree.root.add("Milestones", data=Nav("section", "", "milestones"), expand=False)
@@ -122,11 +125,33 @@ class AgentOSApp(App[None]):
             return self.root / "skills" / f"{self.selected.id}.md"
         return parser.find_item_path(self.root, self.selected.kind, self.selected.id)
 
+    def _update_footer_hints(self, nav: Nav | None) -> None:
+        show_new = (
+            not self.in_detail
+            and nav is not None
+            and (
+                (nav.kind == "section" and nav.section in ("context", "milestones", "tasks", "notes", "skills"))
+                or nav.kind in ("pms", "role", "milestone", "task", "note", "skill")
+            )
+        )
+        show_delete = (
+            not self.in_detail
+            and nav is not None
+            and nav.kind in ("role", "milestone", "task", "note")
+        )
+        for key, action, show in (("n", "new_item", show_new), ("d", "delete_item", show_delete)):
+            bindings = self._bindings.key_to_bindings.get(key, [])
+            for i, b in enumerate(bindings):
+                if b.action == action:
+                    bindings[i] = replace(b, show=show)
+        self.screen.refresh_bindings()
+
     # ── Tree navigation ───────────────────────────────────────────────────────
 
     @on(NavTree.NodeHighlighted, "#nav")
     def on_node_highlighted(self, event: NavTree.NodeHighlighted) -> None:
         nav = cast(Nav | None, event.node.data)
+        self._update_footer_hints(nav)
         if self.in_detail:
             return
         if not nav or nav.kind == "section":
@@ -139,6 +164,7 @@ class AgentOSApp(App[None]):
     @on(NavTree.NodeSelected, "#nav")
     def on_node_selected(self, event: NavTree.NodeSelected) -> None:
         nav = cast(Nav | None, event.node.data)
+        self._update_footer_hints(nav)
         if not nav or nav.kind == "section":
             self.selected = None
             self._clear_detail()
