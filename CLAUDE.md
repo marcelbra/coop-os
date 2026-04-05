@@ -27,7 +27,10 @@
 
 Use squash merge: `gh pr merge <n> --repo marcelbra/agent-os --squash --delete-branch`
 
-**Always merge immediately after creating a PR.** Don't wait for user confirmation — create the PR and merge it in the same workflow.
+**Always merge immediately after creating a PR.** Don't wait for user confirmation — create the PR and merge it in the same workflow. After merging, switch to main and pull to get a fresh state:
+```
+git checkout main && git pull origin main
+```
 
 ### What belongs in separate PRs
 
