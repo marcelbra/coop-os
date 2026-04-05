@@ -19,6 +19,9 @@ Thumbs.db
 
 # Personal data
 content/context/
-content/milestones/
-content/tasks/
-content/notes/
+content/milestones/*
+!content/milestones/template.md
+content/tasks/*
+!content/tasks/template.md
+content/notes/*
+!content/notes/template.md

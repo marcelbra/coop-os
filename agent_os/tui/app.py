@@ -36,8 +36,6 @@ class AgentOSApp(App[None]):
         self.store = ProjectStore(root)
         self.state: ProjectState | None = None
         self.selected: Nav | None = None
-        for d in ("milestones", "tasks", "notes"):
-            (root / "content" / d).mkdir(parents=True, exist_ok=True)
 
     # ── Layout ────────────────────────────────────────────────────────────────
 

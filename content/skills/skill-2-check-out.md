@@ -12,7 +12,7 @@ id: skill-2
 
 2. **Capture loose ends**
    - "Anything that came up today that isn't captured yet?"
-   - Create task files for anything new using `templates/task.md`
+   - Create task files for anything new using `tasks/template.md`
 
 3. **Flag blockers**
    - Any task stuck? Note it in the task's description file
