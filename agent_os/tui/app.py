@@ -8,16 +8,16 @@ from typing import cast
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, ScrollableContainer
-from textual.widgets import Footer, Header, Markdown
+from textual.containers import Horizontal
+from textual.widgets import Footer, Tree
 
 from agent_os import parser
 from agent_os.models import PMS, Milestone, Note, ProjectState, Role, Task
 from agent_os.tui.confirm_delete import ConfirmDeleteScreen
-from agent_os.tui.nav import Nav, _t
+from agent_os.tui.nav import Nav
 from agent_os.tui.render import to_md
 from agent_os.tui.styles import CSS as APP_CSS
-from agent_os.tui.widgets import DetailTextArea, NavTree
+from agent_os.tui.widgets import ContentPanel, DetailTextArea, FixedHeader, NavTree
 
 
 class AgentOSApp(App[None]):
@@ -28,8 +28,7 @@ class AgentOSApp(App[None]):
     BINDINGS = [
         Binding("n", "new_item", "new", show=False),
         Binding("d", "delete_item", "delete", show=False),
-        Binding("ctrl+m", "toggle_mode", "Mode", show=False),
-        Binding("r", "refresh", "Refresh", show=False),
+        Binding("r", "refresh_state", "Refresh", show=False),
     ]
 
     def __init__(self, root: Path) -> None:
@@ -37,17 +36,16 @@ class AgentOSApp(App[None]):
         self.root = root
         self.state: ProjectState | None = None
         self.selected: Nav | None = None
-        self.in_detail: bool = False
         for d in ("context/roles", "milestones", "tasks", "notes"):
             (root / d).mkdir(parents=True, exist_ok=True)
 
     # ── Layout ────────────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
-        yield Header()
+        yield FixedHeader()
         with Horizontal():
             yield NavTree("agent-os", id="nav")
-            yield ScrollableContainer(id="detail")
+            yield ContentPanel(id="content")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -57,54 +55,17 @@ class AgentOSApp(App[None]):
 
     def _reload(self) -> None:
         self.state = parser.read_project(self.root)
-        self._populate_tree()
+        tree = self.query_one(NavTree)
+        tree.populate(self.state, self.root)
         if self.selected:
+            tree.focus_nav(self.selected)
             self._show_view()
         if self.state.errors:
-            self.notify(f"{len(self.state.errors)} parse error(s) — check files", severity="warning", timeout=4)
-
-    def _populate_tree(self) -> None:
-        tree = self.query_one("#nav", NavTree)
-        expanded = {
-            node.data.section
-            for node in tree.root.children
-            if isinstance(node.data, Nav) and node.is_expanded
-        }
-        tree.clear()
-        s = self.state
-        if not s:
-            return
-
-        ctx = tree.root.add("Context", data=Nav("section", "", "context"), expand="context" in expanded)
-        if s.pms:
-            ctx.add_leaf(_t("Personal Mission Statement"), data=Nav("pms", "pms", "context"))
-        for r in s.roles:
-            emoji = r.emoji.replace("\ufe0f", "").replace("\ufe0e", "")
-            ctx.add_leaf(_t(f"{emoji} {r.name}"), data=Nav("role", r.id, "context"))
-
-        _ms_icon = {"active": "•", "completed": "✓", "cancelled": "✗"}
-        ms_node = tree.root.add("Milestones", data=Nav("section", "", "milestones"), expand="milestones" in expanded)
-        for m in s.milestones:
-            ms_node.add_leaf(_t(f"{_ms_icon.get(m.status, '•')} {m.title}"), data=Nav("milestone", m.id, "milestones"))
-
-        _task_icon = {"todo": "•", "in_progress": "▶", "waiting": "…", "done": "✓", "cancelled": "✗"}
-        tasks_node = tree.root.add("Tasks", data=Nav("section", "", "tasks"), expand="tasks" in expanded)
-        for t in s.tasks:
-            tasks_node.add_leaf(_t(f"{_task_icon.get(t.status, '•')} {t.title}"), data=Nav("task", t.id, "tasks"))
-
-        notes_node = tree.root.add("Notes", data=Nav("section", "", "notes"), expand="notes" in expanded)
-        for n in s.notes:
-            icon = "•" if not n.scanned else "·"
-            notes_node.add_leaf(_t(f"{icon} {n.title}"), data=Nav("note", n.id, "notes"))
-
-        skills_dir = self.root / "skills"
-        if skills_dir.exists():
-            skills_node = tree.root.add("Skills", data=Nav("section", "", "skills"), expand="skills" in expanded)
-            for p in sorted(skills_dir.glob("*.md")):
-                skills_node.add_leaf(_t(p.stem), data=Nav("skill", p.stem, "skills"))
-
-        if (self.root / "AGENT.md").exists():
-            tree.root.add_leaf("AGENT.md", data=Nav("agent", "agent", ""))
+            self.notify(
+                f"{len(self.state.errors)} parse error(s) — check files",
+                severity="warning",
+                timeout=4,
+            )
 
     def _item(self) -> PMS | Role | Milestone | Task | Note | None:
         n = self.selected
@@ -134,16 +95,25 @@ class AgentOSApp(App[None]):
         return parser.find_item_path(self.root, self.selected.kind, self.selected.id)
 
     def _update_footer_hints(self, nav: Nav | None) -> None:
+        content = self.query_one(ContentPanel)
         show_new = (
-            not self.in_detail
+            not content.is_editing
             and nav is not None
             and (
-                (nav.kind == "section" and nav.section in ("context", "milestones", "tasks", "notes", "skills"))
+                nav.kind == "section"
+                and nav.section in ("context", "milestones", "tasks", "notes", "skills")
                 or nav.kind in ("pms", "role", "milestone", "task", "note", "skill")
             )
         )
-        show_delete = not self.in_detail and nav is not None and nav.kind in ("role", "milestone", "task", "note")
-        for key, action, show in (("n", "new_item", show_new), ("d", "delete_item", show_delete)):
+        show_delete = (
+            not content.is_editing
+            and nav is not None
+            and nav.kind in ("role", "milestone", "task", "note")
+        )
+        for key, action, show in (
+            ("n", "new_item", show_new),
+            ("d", "delete_item", show_delete),
+        ):
             bindings = self._bindings.key_to_bindings.get(key, [])
             for i, b in enumerate(bindings):
                 if b.action == action:
@@ -152,43 +122,60 @@ class AgentOSApp(App[None]):
 
     # ── Tree navigation ───────────────────────────────────────────────────────
 
-    @on(NavTree.NodeHighlighted, "#nav")
-    def on_node_highlighted(self, event: NavTree.NodeHighlighted) -> None:
+    @on(Tree.NodeHighlighted, "#nav")
+    def on_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
         nav = cast(Nav | None, event.node.data)
         self._update_footer_hints(nav)
-        if self.in_detail:
+        content = self.query_one(ContentPanel)
+        if content.is_editing:
             return
         if not nav or nav.kind == "section":
             self.selected = None
-            self._clear_detail()
+            content.clear()
             return
         self.selected = nav
         self._show_view()
 
-    @on(NavTree.NodeSelected, "#nav")
-    def on_node_selected(self, event: NavTree.NodeSelected) -> None:
+    @on(Tree.NodeSelected, "#nav")
+    def on_node_selected(self, event: Tree.NodeSelected) -> None:
         nav = cast(Nav | None, event.node.data)
         self._update_footer_hints(nav)
+        content = self.query_one(ContentPanel)
         if not nav or nav.kind == "section":
             self.selected = None
-            self._clear_detail()
+            content.clear()
             return
-        if self.in_detail:
+        if content.is_editing:
             self._save_current()
-            self.in_detail = False
         self.selected = nav
         self._show_view()
 
-    # ── View / Edit mode ──────────────────────────────────────────────────────
+    # ── Edit mode ─────────────────────────────────────────────────────────────
 
-    @work(exclusive=True)
-    async def _clear_detail(self) -> None:
-        detail = self.query_one("#detail", ScrollableContainer)
-        await detail.remove_children()
+    @on(NavTree.EditRequested)
+    def on_edit_requested(self) -> None:
+        if self.selected and self.selected.kind != "section":
+            self._show_edit()
+
+    @on(DetailTextArea.ExitRequested)
+    def on_exit_requested(self) -> None:
+        self._exit_edit_mode()
+
+    def _exit_edit_mode(self) -> None:
+        self._save_current()
+        self.query_one(ContentPanel).remove_class("-editing")
+        self._show_view()
+        self._update_footer_hints(self.selected)
+        self.call_after_refresh(self.query_one(NavTree).focus)
+
+    # ── View / Edit ───────────────────────────────────────────────────────────
 
     @work(exclusive=True)
     async def _show_view(self) -> None:
         if not self.selected:
+            return
+        content = self.query_one(ContentPanel)
+        if content.is_editing:
             return
         if self.selected.kind in ("agent", "skill"):
             path = self._item_path()
@@ -198,92 +185,59 @@ class AgentOSApp(App[None]):
             if not item:
                 return
             md = to_md(item, self.selected.kind)
-        detail = self.query_one("#detail", ScrollableContainer)
-        await detail.remove_children()
-        await detail.mount(Markdown(md))
+        await content.show_view(md)
 
-    @work(exclusive=True)
-    async def _show_edit(self) -> None:
+    def _show_edit(self) -> None:
         path = self._item_path()
         if not path or not path.exists():
             return
-        raw = path.read_text(encoding="utf-8")
-        detail = self.query_one("#detail", ScrollableContainer)
-        await detail.remove_children()
-        ta = DetailTextArea(raw, id="f-body", language="markdown", theme="vscode_dark")
-        await detail.mount(ta)
-        ta.move_cursor((0, 0))
-        ta.focus()
-
-    def action_jump_to_detail(self) -> None:
-        if not self.selected or self.selected.kind == "section":
-            return
-        self.in_detail = True
-        self._show_edit()
-
-    def action_leave_detail(self) -> None:
-        if not self.in_detail:
-            return
-        self._save_current()
-        self.in_detail = False
-        self._show_view()
-        self._update_footer_hints(self.selected)
-        self.call_after_refresh(self.query_one("#nav", NavTree).focus)
-
-    def action_toggle_mode(self) -> None:
-        if self.in_detail:
-            self.action_leave_detail()
-        else:
-            self.action_jump_to_detail()
+        self.query_one(ContentPanel).enter_edit(
+            path.read_text(encoding="utf-8")
+        )
 
     # ── Auto-save ─────────────────────────────────────────────────────────────
 
     def _save_current(self) -> None:
-        if not self.selected or not self.in_detail:
+        content = self.query_one(ContentPanel)
+        if not self.selected or not content.is_editing:
             return
         path = self._item_path()
         if not path:
             return
         try:
-            ta = self.query_one("#f-body", DetailTextArea)
-            path.write_text(ta.text, encoding="utf-8")
+            path.write_text(content.editor_text, encoding="utf-8")
             self.state = parser.read_project(self.root)
         except Exception as e:
             self.notify(str(e), severity="error", timeout=4)
 
     # ── Create / Delete ───────────────────────────────────────────────────────
 
-    def _expand_and_focus_nav(self, nav: Nav) -> None:
-        tree = self.query_one("#nav", NavTree)
-        if nav.kind == "section":
-            for section in tree.root.children:
-                if isinstance(section.data, Nav) and section.data.section == nav.section:
-                    self.call_after_refresh(lambda n=section: tree.move_cursor(n))
-                    return
-            return
-        for section in tree.root.children:
-            for leaf in section.children:
-                if isinstance(leaf.data, Nav) and leaf.data.id == nav.id and leaf.data.kind == nav.kind:
-                    section.expand()
-                    self.call_after_refresh(lambda n=leaf: tree.move_cursor(n))
-                    return
-
     def action_new_item(self) -> None:
-        if self.in_detail or not self.state or (self.selected and self.selected.kind in ("agent", "skill")):
+        content = self.query_one(ContentPanel)
+        if content.is_editing or not self.state:
             return
+        if self.selected and self.selected.kind in ("agent", "skill"):
+            return
+
         if self.selected:
             section = self.selected.section
         else:
-            cursor = self.query_one("#nav", NavTree).cursor_node
+            cursor = self.query_one(NavTree).cursor_node
             nav = cast(Nav | None, cursor.data if cursor else None)
             section = nav.section if nav and nav.kind == "section" else "notes"
+
         today = date.today().isoformat()
         new_item: Role | Milestone | Task | Note
         kind: str
 
         match section:
             case "context":
-                new_item = Role(id=parser.next_role_id(self.root), name="New Role", emoji="⭐", title="")
+                new_item = Role(
+                    id=parser.next_role_id(self.root),
+                    name="New Role",
+                    emoji="⭐",
+                    title="",
+                )
                 parser.write_role(self.root, new_item)
                 kind = "role"
             case "milestones":
@@ -298,29 +252,40 @@ class AgentOSApp(App[None]):
                 parser.write_milestone(self.root, new_item)
                 kind = "milestone"
             case "tasks":
-                new_item = Task(id=parser.next_task_id(self.root), title="New Task", created_date=today)
+                new_item = Task(
+                    id=parser.next_task_id(self.root),
+                    title="New Task",
+                    created_date=today,
+                )
                 parser.write_task(self.root, new_item)
                 kind = "task"
-            case _:  # notes
-                new_item = Note(id=parser.next_note_id(self.root), title="New Note", date=today)
+            case _:
+                new_item = Note(
+                    id=parser.next_note_id(self.root), title="New Note", date=today
+                )
                 parser.write_note(self.root, new_item)
                 kind = "note"
 
         self.state = parser.read_project(self.root)
-        self._populate_tree()
+        tree = self.query_one(NavTree)
+        tree.populate(self.state, self.root)
         self.selected = Nav(kind, new_item.id, section)
-        self._expand_and_focus_nav(self.selected)
-        self.in_detail = True
+        tree.focus_nav(self.selected)
         self._show_edit()
 
     def action_delete_item(self) -> None:
-        if self.in_detail or not self.selected or self.selected.kind in ("section", "pms", "agent", "skill"):
+        content = self.query_one(ContentPanel)
+        if (
+            content.is_editing
+            or not self.selected
+            or self.selected.kind in ("section", "pms", "agent", "skill")
+        ):
             return
         nav = self.selected
         item = self._item()
         name = getattr(item, "title", None) or getattr(item, "name", None) or nav.id
 
-        tree = self.query_one("#nav", NavTree)
+        tree = self.query_one(NavTree)
         section_leaves = [
             leaf.data
             for section in tree.root.children
@@ -332,7 +297,9 @@ class AgentOSApp(App[None]):
         idx = next((i for i, n in enumerate(section_leaves) if n.id == nav.id), None)
         if idx is not None and len(section_leaves) > 1:
             next_nav: Nav = (
-                section_leaves[idx + 1] if idx + 1 < len(section_leaves) else section_leaves[idx - 1]
+                section_leaves[idx + 1]
+                if idx + 1 < len(section_leaves)
+                else section_leaves[idx - 1]
             )
         else:
             next_nav = Nav("section", "", nav.section)
@@ -340,7 +307,9 @@ class AgentOSApp(App[None]):
         self._confirm_and_delete(nav, name, next_nav)
 
     @work
-    async def _confirm_and_delete(self, nav: Nav, name: str, next_nav: Nav | None) -> None:
+    async def _confirm_and_delete(
+        self, nav: Nav, name: str, next_nav: Nav | None
+    ) -> None:
         if not await self.push_screen_wait(ConfirmDeleteScreen(name)):
             return
         deleted = False
@@ -358,12 +327,12 @@ class AgentOSApp(App[None]):
             self._reload()
             self.notify("Deleted", severity="warning", timeout=2)
             if next_nav:
-                self._expand_and_focus_nav(next_nav)
+                self.query_one(NavTree).focus_nav(next_nav)
                 if next_nav.kind != "section":
                     self._show_view()
 
     # ── Misc ──────────────────────────────────────────────────────────────────
 
-    def action_refresh(self) -> None:
+    def action_refresh_state(self) -> None:
         self._reload()
         self.notify("Refreshed", severity="information", timeout=2)

@@ -6,7 +6,7 @@ _TREE_WIDTH = 30
 _LABEL_MAX = 22
 
 
-def _t(s: str) -> str:
+def truncate_label(s: str) -> str:
     """Truncate a tree label to prevent horizontal overflow."""
     return s if len(s) <= _LABEL_MAX else s[: _LABEL_MAX - 1] + "…"
 
