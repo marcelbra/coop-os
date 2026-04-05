@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import calendar as _cal_mod
 from datetime import date as _date
 from pathlib import Path
 from typing import Any
@@ -150,6 +151,12 @@ class FieldInput(Input):
 class DateFieldInput(FieldInput):
     """FieldInput with ISO date (YYYY-MM-DD) validation. Reverts on bad input."""
 
+    class CalendarRequested(Message):
+        def __init__(self, attr_key: str, current_value: str) -> None:
+            super().__init__()
+            self.attr_key = attr_key
+            self.current_value = current_value
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._prev_value: str = ""
@@ -171,6 +178,321 @@ class DateFieldInput(FieldInput):
                 timeout=4,
             )
             self.value = self._prev_value
+
+    def on_key(self, event: Key) -> None:
+        super().on_key(event)
+        if event.key == "enter":
+            event.prevent_default()
+            event.stop()
+            attr_key = (self.id or "").removeprefix("se-inp-")
+            self.post_message(DateFieldInput.CalendarRequested(attr_key, self.value))
+
+
+class CalendarWidget(Widget):
+    """Inline popup calendar for date field selection.
+
+    Posts ``DateSelected`` when the user confirms a day, or ``Dismissed``
+    when they press Escape or Left from the leftmost header position.
+    """
+
+    can_focus = True
+
+    _MONTHS: list[str] = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
+    ]
+    _DAYS: list[str] = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
+
+    class DateSelected(Message):
+        def __init__(self, date: _date) -> None:
+            super().__init__()
+            self.date = date
+
+    class Dismissed(Message):
+        pass
+
+    def __init__(
+        self,
+        initial: _date | None = None,
+        attr_key: str = "",
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        base = initial or _date.today()
+        self._year: int = base.year
+        self._month: int = base.month
+        self._attr_key: str = attr_key
+        self._mode: str = "cal"         # "cal" | "month" | "year"
+        self._drop_cursor: int = 0
+        # ("header", col) where col: 0=<  1=month  2=year  3=>
+        # ("day", row, col) where row/col index the day grid
+        self._focus: tuple = ("header", 0)
+        if initial and initial.year == self._year and initial.month == self._month:
+            self._init_focus(initial)
+
+    # ── Helpers ────────────────────────────────────────────────────────────
+
+    def _weeks(self) -> list[list[int | None]]:
+        """Weeks as 7-element lists (Su=0..Sa=6). None for empty cells."""
+        first_iso, num_days = _cal_mod.monthrange(self._year, self._month)
+        # ISO Mon=0..Sun=6 → Sunday-first Sun=0..Sat=6
+        first_col = (first_iso + 1) % 7
+        weeks: list[list[int | None]] = []
+        week: list[int | None] = [None] * 7
+        col = first_col
+        for day in range(1, num_days + 1):
+            week[col] = day
+            col += 1
+            if col == 7:
+                weeks.append(week)
+                week = [None] * 7
+                col = 0
+        if any(d is not None for d in week):
+            weeks.append(week)
+        return weeks
+
+    def _year_range(self) -> list[int]:
+        return list(range(self._year - 10, self._year + 11))
+
+    def _init_focus(self, d: _date) -> None:
+        for r, week in enumerate(self._weeks()):
+            for c, day in enumerate(week):
+                if day == d.day:
+                    self._focus = ("day", r, c)
+                    return
+
+    def _adjust_height(self) -> None:
+        if self._mode == "cal":
+            self.styles.height = 2 + len(self._weeks())
+        elif self._mode == "month":
+            self.styles.height = 13
+        else:
+            self.styles.height = 1 + len(self._year_range())
+
+    # ── Rendering ──────────────────────────────────────────────────────────
+
+    def on_mount(self) -> None:
+        self._adjust_height()
+
+    def _hl(self, text: str, active: bool) -> str:
+        return f"[reverse]{text}[/reverse]" if active else text
+
+    def _header_line(self) -> str:
+        f = self._focus
+        in_hdr = f[0] == "header"
+        prev = self._hl("<", in_hdr and f[1] == 0)
+        mname = self._MONTHS[self._month - 1]
+        month = self._hl(mname, in_hdr and f[1] == 1)
+        year = self._hl(str(self._year), in_hdr and f[1] == 2)
+        nxt = self._hl(">", in_hdr and f[1] == 3)
+        return f"{prev} {month}  {year}  {nxt}"
+
+    def render(self) -> str:
+        if self._mode == "cal":
+            lines = [self._header_line(), " ".join(self._DAYS)]
+            for r, week in enumerate(self._weeks()):
+                cells = []
+                for c, day in enumerate(week):
+                    if day is None:
+                        cells.append("  ")
+                    else:
+                        txt = f"{day:2d}"
+                        cells.append(self._hl(txt, self._focus == ("day", r, c)))
+                lines.append(" ".join(cells))
+            return "\n".join(lines)
+
+        elif self._mode == "month":
+            lines = [self._header_line()]
+            for i, m in enumerate(self._MONTHS):
+                cur = i == self._drop_cursor
+                label = f"> {m}" if cur else f"  {m}"
+                lines.append(self._hl(label, cur))
+            return "\n".join(lines)
+
+        else:  # year
+            lines = [self._header_line()]
+            for i, y in enumerate(self._year_range()):
+                cur = i == self._drop_cursor
+                label = f"> {y}" if cur else f"  {y}"
+                lines.append(self._hl(label, cur))
+            return "\n".join(lines)
+
+    # ── Key handling ───────────────────────────────────────────────────────
+
+    def on_key(self, event: Key) -> None:
+        if self._mode == "cal":
+            self._cal_key(event)
+        else:
+            self._drop_key(event)
+
+    def _cal_key(self, event: Key) -> None:  # noqa: C901
+        key = event.key
+        f = self._focus
+
+        if key == "escape":
+            event.prevent_default()
+            event.stop()
+            self.post_message(CalendarWidget.Dismissed())
+
+        elif key == "left":
+            event.prevent_default()
+            event.stop()
+            if f[0] == "header":
+                if f[1] > 0:
+                    self._focus = ("header", f[1] - 1)
+                else:
+                    self.post_message(CalendarWidget.Dismissed())
+                    return
+            elif f[0] == "day":
+                self._step_day(-1)
+            self.refresh()
+
+        elif key == "right":
+            event.prevent_default()
+            event.stop()
+            if f[0] == "header" and f[1] < 3:
+                self._focus = ("header", f[1] + 1)
+            elif f[0] == "day":
+                self._step_day(+1)
+            self.refresh()
+
+        elif key == "up":
+            event.prevent_default()
+            event.stop()
+            if f[0] == "day":
+                if f[1] == 0:
+                    # Top row of days → jump to header <
+                    self._focus = ("header", 0)
+                else:
+                    self._move_row(f[1] - 1, f[2])
+            self.refresh()
+
+        elif key == "down":
+            event.prevent_default()
+            event.stop()
+            if f[0] == "header":
+                weeks = self._weeks()
+                if weeks:
+                    for c, d in enumerate(weeks[0]):
+                        if d is not None:
+                            self._focus = ("day", 0, c)
+                            break
+            elif f[0] == "day":
+                self._move_row(f[1] + 1, f[2])
+            self.refresh()
+
+        elif key == "enter":
+            event.prevent_default()
+            event.stop()
+            if f[0] == "header":
+                self._header_action(f[1])
+            elif f[0] == "day":
+                weeks = self._weeks()
+                day = weeks[f[1]][f[2]]
+                if day:
+                    self.post_message(
+                        CalendarWidget.DateSelected(_date(self._year, self._month, day))
+                    )
+                    return
+            self.refresh()
+
+    def _drop_key(self, event: Key) -> None:
+        key = event.key
+        n = 12 if self._mode == "month" else len(self._year_range())
+
+        if key in ("escape", "left"):
+            event.prevent_default()
+            event.stop()
+            self._mode = "cal"
+            self._adjust_height()
+            self.refresh()
+
+        elif key == "up":
+            event.prevent_default()
+            event.stop()
+            self._drop_cursor = max(0, self._drop_cursor - 1)
+            self.refresh()
+
+        elif key == "down":
+            event.prevent_default()
+            event.stop()
+            self._drop_cursor = min(n - 1, self._drop_cursor + 1)
+            self.refresh()
+
+        elif key == "enter":
+            event.prevent_default()
+            event.stop()
+            if self._mode == "month":
+                self._month = self._drop_cursor + 1
+            else:
+                self._year = self._year_range()[self._drop_cursor]
+            self._mode = "cal"
+            self._adjust_height()
+            self.refresh()
+
+    def _header_action(self, col: int) -> None:
+        if col == 0:
+            self._prev_month()
+        elif col == 1:
+            self._mode = "month"
+            self._drop_cursor = self._month - 1
+            self._adjust_height()
+        elif col == 2:
+            self._mode = "year"
+            years = self._year_range()
+            self._drop_cursor = years.index(self._year)
+            self._adjust_height()
+        elif col == 3:
+            self._next_month()
+
+    def _prev_month(self) -> None:
+        if self._month == 1:
+            self._month, self._year = 12, self._year - 1
+        else:
+            self._month -= 1
+        self._adjust_height()
+
+    def _next_month(self) -> None:
+        if self._month == 12:
+            self._month, self._year = 1, self._year + 1
+        else:
+            self._month += 1
+        self._adjust_height()
+
+    def _step_day(self, delta: int) -> None:
+        """Move focus one day left/right, wrapping across rows."""
+        f = self._focus
+        weeks = self._weeks()
+        r, c = f[1], f[2]
+        while True:
+            c += delta
+            if c < 0:
+                r -= 1
+                c = 6
+            elif c > 6:
+                r += 1
+                c = 0
+            if r < 0 or r >= len(weeks):
+                return
+            if weeks[r][c] is not None:
+                self._focus = ("day", r, c)
+                return
+
+    def _move_row(self, target_row: int, col: int) -> None:
+        """Move to target_row at same column (or nearest valid day)."""
+        weeks = self._weeks()
+        if target_row < 0 or target_row >= len(weeks):
+            return
+        if weeks[target_row][col] is not None:
+            self._focus = ("day", target_row, col)
+            return
+        for dc in range(1, 7):
+            if col + dc <= 6 and weeks[target_row][col + dc] is not None:
+                self._focus = ("day", target_row, col + dc)
+                return
+            if col - dc >= 0 and weeks[target_row][col - dc] is not None:
+                self._focus = ("day", target_row, col - dc)
+                return
 
 
 class SelectInput(Widget):
@@ -233,7 +555,7 @@ class SelectInput(Widget):
         self.styles.height = 1
         self.refresh()
 
-    def on_key(self, event: Key) -> None:
+    def on_key(self, event: Key) -> None:  # noqa: C901
         if self.disabled:
             return
         if not self._open:
@@ -330,8 +652,10 @@ class StructuredEditor(Widget):
         yield Rule(classes="se-sep")
         yield BodyTextArea("", id="se-body", language="markdown", theme="vscode_dark")
 
-    def load(self, item: Any, kind: str) -> None:
+    def load(self, item: Any, kind: str) -> None:  # noqa: C901
         """Populate fields from *item* and show only the fields relevant to *kind*."""
+        for cal in self.query(CalendarWidget):
+            cal.remove()
         self._kind = kind
 
         root = getattr(self.app, "root", None)
@@ -394,6 +718,8 @@ class StructuredEditor(Widget):
 
     def focus_first(self, select_all: bool = False) -> None:
         """Focus the first editable field, falling back to the body."""
+        for cal in self.query(CalendarWidget):
+            cal.remove()
         for attr_key, _label, kinds, readonly in FIELD_DEFS:
             if self._kind in kinds and not readonly:
                 inp = self.query_one(f"#se-inp-{attr_key}", FieldInput)
@@ -417,6 +743,8 @@ class StructuredEditor(Widget):
     @on(FieldInput.Navigate)
     def _on_navigate(self, event: FieldInput.Navigate) -> None:
         event.stop()
+        for cal in self.query(CalendarWidget):
+            cal.remove()
         inputs = self._visible_inputs()
         if not inputs:
             return
@@ -436,6 +764,50 @@ class StructuredEditor(Widget):
         else:
             inputs[new_idx].focus()
         self.post_message(StructuredEditor.Changed())
+
+    @on(DateFieldInput.CalendarRequested)
+    def _on_calendar_requested(self, event: DateFieldInput.CalendarRequested) -> None:
+        event.stop()
+        for cal in self.query(CalendarWidget):
+            cal.remove()
+        try:
+            initial = _date.fromisoformat(event.current_value.strip())
+        except (ValueError, AttributeError):
+            initial = None
+            if event.attr_key == "end_date":
+                try:
+                    start_val = self.query_one("#se-inp-start_date").value.strip()  # type: ignore[union-attr]
+                    initial = _date.fromisoformat(start_val)
+                except Exception:
+                    pass
+        row = self.query_one(f"#se-row-{event.attr_key}")
+        cal = CalendarWidget(initial=initial, attr_key=event.attr_key, id="se-calendar")
+        self.mount(cal, after=row)
+        self.call_after_refresh(cal.focus)
+
+    @on(CalendarWidget.DateSelected)
+    def _on_cal_date_selected(self, event: CalendarWidget.DateSelected) -> None:
+        event.stop()
+        for cal in list(self.query(CalendarWidget)):
+            attr_key = cal._attr_key
+            cal.remove()
+            if attr_key:
+                inp = self.query_one(f"#se-inp-{attr_key}")
+                inp.value = event.date.isoformat()  # type: ignore[union-attr]
+                inp.focus()
+        self.post_message(StructuredEditor.Changed())
+
+    @on(CalendarWidget.Dismissed)
+    def _on_cal_dismissed(self, event: CalendarWidget.Dismissed) -> None:
+        event.stop()
+        for cal in list(self.query(CalendarWidget)):
+            attr_key = cal._attr_key
+            cal.remove()
+            if attr_key:
+                try:
+                    self.query_one(f"#se-inp-{attr_key}").focus()
+                except Exception:
+                    pass
 
     @property
     def editor_text(self) -> str:
