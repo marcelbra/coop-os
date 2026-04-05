@@ -241,7 +241,7 @@ class NoteStore:
 class SkillStore:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self._dir = root / "agent_os" / "content" / "skills"
+        self._dir = root / "agent_os" / "skills"
 
     def load_all(self) -> tuple[list[Skill], list[ParseError]]:
         skills: list[Skill] = []
@@ -257,7 +257,7 @@ class SkillStore:
                     content=content,
                 ))
             except Exception as e:
-                errors.append(ParseError(file=f"agent_os/content/skills/{path.name}", error=str(e)))
+                errors.append(ParseError(file=f"agent_os/skills/{path.name}", error=str(e)))
         return skills, errors
 
     def next_id(self) -> str:
