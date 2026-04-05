@@ -1,6 +1,6 @@
 ---
-id: skill-2
 command: /check-out
+id: skill-2
 ---
 
 ## Steps
