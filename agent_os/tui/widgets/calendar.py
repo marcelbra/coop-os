@@ -22,7 +22,7 @@ class CalendarWidget(Widget):
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December",
     ]
-    _DAYS: list[str] = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
+    _DAYS: list[str] = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 
     class DateSelected(Message):
         def __init__(self, date: _date) -> None:
@@ -54,10 +54,10 @@ class CalendarWidget(Widget):
     # ── Helpers ────────────────────────────────────────────────────────────
 
     def _weeks(self) -> list[list[int | None]]:
-        """Weeks as 7-element lists (Su=0..Sa=6). None for empty cells."""
+        """Weeks as 7-element lists (Mo=0..Su=6). None for empty cells."""
         first_iso, num_days = _cal_mod.monthrange(self._year, self._month)
-        # ISO Mon=0..Sun=6 → Sunday-first Sun=0..Sat=6
-        first_col = (first_iso + 1) % 7
+        # ISO Mon=0..Sun=6 — already Monday-first
+        first_col = first_iso
         weeks: list[list[int | None]] = []
         week: list[int | None] = [None] * 7
         col = first_col
