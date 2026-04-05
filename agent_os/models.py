@@ -19,24 +19,9 @@ class MilestoneStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
-class PMS(BaseModel):
-    id: str = "pms"
-    title: str
-    content: str = ""
-
-
-class Role(BaseModel):
-    id: str
-    name: str
-    emoji: str
-    title: str
-    content: str = ""
-
-
 class Milestone(BaseModel):
     id: str
     title: str
-    role: str
     start_date: str = ""
     end_date: str = ""
     status: MilestoneStatus = MilestoneStatus.ACTIVE
@@ -68,8 +53,6 @@ class ParseError(BaseModel):
 
 
 class ProjectState(BaseModel):
-    pms: PMS | None = None
-    roles: list[Role] = []
     milestones: list[Milestone] = []
     tasks: list[Task] = []
     notes: list[Note] = []

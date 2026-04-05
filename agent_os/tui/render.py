@@ -2,24 +2,17 @@ from __future__ import annotations
 
 from typing import cast
 
-from agent_os.models import PMS, Milestone, Note, Role, Task
+from agent_os.models import Milestone, Note, Task
 
 
-def to_md(item: PMS | Role | Milestone | Task | Note, kind: str) -> str:
+def to_md(item: Milestone | Task | Note, kind: str) -> str:
     match kind:
-        case "pms":
-            pms = cast(PMS, item)
-            return f"# {pms.title}\n\n{pms.content}"
-        case "role":
-            role = cast(Role, item)
-            return f"# {role.emoji} {role.name}\n\n*{role.title}*\n\n---\n\n{role.content}"
         case "milestone":
             ms = cast(Milestone, item)
             return (
                 f"# {ms.title}\n\n"
                 f"| | |\n|:--|:--|\n"
                 f"| id | `{ms.id}` |\n"
-                f"| role | {ms.role} |\n"
                 f"| start | {ms.start_date} |\n"
                 f"| end | {ms.end_date} |\n"
                 f"| status | **{ms.status}** |\n\n"

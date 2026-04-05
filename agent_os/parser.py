@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_os.models import PMS, Milestone, Note, ParseError, ProjectState, Role, Task
+from agent_os.models import Milestone, Note, ParseError, ProjectState, Task
 from agent_os.store import ProjectStore
 
 
@@ -13,14 +13,6 @@ def read_project(root: Path) -> ProjectState:
 
 def find_item_path(root: Path, kind: str, item_id: str) -> Path | None:
     return ProjectStore(root).find_item_path(kind, item_id)
-
-
-def read_pms(root: Path) -> tuple[PMS | None, ParseError | None]:
-    return ProjectStore(root).pms.load()
-
-
-def read_roles(root: Path) -> tuple[list[Role], list[ParseError]]:
-    return ProjectStore(root).roles.load_all()
 
 
 def read_milestones(root: Path) -> tuple[list[Milestone], list[ParseError]]:
@@ -35,14 +27,6 @@ def read_notes(root: Path) -> tuple[list[Note], list[ParseError]]:
     return ProjectStore(root).notes.load_all()
 
 
-def write_pms(root: Path, pms: PMS) -> None:
-    ProjectStore(root).pms.save(pms)
-
-
-def write_role(root: Path, role: Role) -> None:
-    ProjectStore(root).roles.save(role)
-
-
 def write_milestone(root: Path, ms: Milestone) -> None:
     ProjectStore(root).milestones.save(ms)
 
@@ -55,10 +39,6 @@ def write_note(root: Path, note: Note) -> None:
     ProjectStore(root).notes.save(note)
 
 
-def delete_role(root: Path, role_id: str) -> bool:
-    return ProjectStore(root).roles.delete(role_id)
-
-
 def delete_milestone(root: Path, ms_id: str) -> bool:
     return ProjectStore(root).milestones.delete(ms_id)
 
@@ -69,10 +49,6 @@ def delete_task(root: Path, task_id: str) -> bool:
 
 def delete_note(root: Path, note_id: str) -> bool:
     return ProjectStore(root).notes.delete(note_id)
-
-
-def next_role_id(root: Path) -> str:
-    return ProjectStore(root).roles.next_id()
 
 
 def next_milestone_id(root: Path) -> str:

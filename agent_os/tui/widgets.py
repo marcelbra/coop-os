@@ -18,12 +18,9 @@ from agent_os.tui.nav import Nav, truncate_label
 
 # (attr_key, display_label, visible_for_kinds, readonly)
 FIELD_DEFS: list[tuple[str, str, frozenset[str], bool]] = [
-    ("name",         "name",       frozenset({"role"}),                                     False),
-    ("emoji",        "emoji",      frozenset({"role"}),                                     False),
-    ("title",        "title",      frozenset({"pms", "role", "milestone", "task", "note"}), False),
+    ("title",        "title",      frozenset({"milestone", "task", "note"}),                False),
     ("date",         "date",       frozenset({"note"}),                                     False),
     ("scanned",      "scanned",    frozenset({"note"}),                                     False),
-    ("role",         "role",       frozenset({"milestone"}),                                False),
     ("start_date",   "start date", frozenset({"milestone"}),                                False),
     ("end_date",     "end date",   frozenset({"milestone"}),                                False),
     ("status",       "status",     frozenset({"milestone", "task"}),                        False),
@@ -31,12 +28,10 @@ FIELD_DEFS: list[tuple[str, str, frozenset[str], bool]] = [
     ("labels",       "labels",     frozenset({"task"}),                                     False),
     ("dependencies", "depends on", frozenset({"task"}),                                     False),
     ("created_date", "created",    frozenset({"task"}),                                     False),
-    ("id",           "id",         frozenset({"pms", "role", "milestone", "task", "note"}), True),
+    ("id",           "id",         frozenset({"milestone", "task", "note"}),                True),
 ]
 
 BODY_ATTR: dict[str, str] = {
-    "pms": "content",
-    "role": "content",
     "milestone": "description",
     "task": "description",
     "note": "content",
@@ -237,7 +232,7 @@ class ContentPanel(Widget):
     CSS classes:
       (none)             → view mode (Markdown visible)
       -editing           → raw edit mode (agent / skill files)
-      -editing-struct    → structured edit mode (pms / role / milestone / task / note)
+      -editing-struct    → structured edit mode (milestone / task / note)
     """
 
     def compose(self):
@@ -267,7 +262,7 @@ class ContentPanel(Widget):
         ta.focus()
 
     def show_struct_view(self, item: Any, kind: str) -> None:
-        """Structured view mode (read-only) for pms / role / milestone / task / note."""
+        """Structured view mode (read-only) for milestone / task / note."""
         se = self.query_one(StructuredEditor)
         se.load(item, kind)
         se.set_editable(False)
@@ -276,7 +271,7 @@ class ContentPanel(Widget):
         self.add_class("-view-struct")
 
     def enter_structured_edit(self, item: Any, kind: str) -> None:
-        """Structured edit mode for pms / role / milestone / task / note."""
+        """Structured edit mode for milestone / task / note."""
         se = self.query_one(StructuredEditor)
         se.load(item, kind)
         se.set_editable(True)
@@ -376,16 +371,6 @@ class NavTree(Tree):
             if isinstance(node.data, Nav) and node.is_expanded
         }
         self.clear()
-
-        ctx = self.root.add(
-            "Context", data=Nav("section", "", "context"), expand="context" in expanded
-        )
-        if state.pms:
-            ctx.add_leaf(
-                truncate_label("Personal Mission Statement"), data=Nav("pms", "pms", "context")
-            )
-        for r in state.roles:
-            ctx.add_leaf(truncate_label(f"{r.emoji} {r.name}"), data=Nav("role", r.id, "context"))
 
         ms_icons = {"active": "•", "completed": "✓", "cancelled": "✗"}
         ms = self.root.add(

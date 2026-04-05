@@ -7,12 +7,10 @@ from pathlib import Path
 import frontmatter
 
 from agent_os.models import (
-    PMS,
     Milestone,
     Note,
     ParseError,
     ProjectState,
-    Role,
     Task,
 )
 
@@ -76,68 +74,6 @@ def _find_task_dir(tasks_dir: Path, task_id: str) -> Path | None:
 # ── Entity stores ─────────────────────────────────────────────────────────────
 
 
-class PMSStore:
-    def __init__(self, root: Path) -> None:
-        self.root = root
-        self._path = root / "context" / "0-pms.md"
-
-    def load(self) -> tuple[PMS | None, ParseError | None]:
-        if not self._path.exists():
-            return None, ParseError(file="context/0-pms.md", error="Required file missing")
-        try:
-            meta, content = _read_fm(self._path)
-            return PMS(id="pms", title=meta.get("title", "Personal Mission Statement"), content=content), None
-        except Exception as e:
-            return None, ParseError(file="context/0-pms.md", error=str(e))
-
-    def save(self, pms: PMS) -> None:
-        _write_fm(self._path, {"id": "pms", "title": pms.title}, pms.content)
-
-
-class RoleStore:
-    def __init__(self, root: Path) -> None:
-        self.root = root
-        self._dir = root / "context" / "roles"
-
-    def load_all(self) -> tuple[list[Role], list[ParseError]]:
-        roles: list[Role] = []
-        errors: list[ParseError] = []
-        if not self._dir.exists():
-            return roles, errors
-        for path in sorted(self._dir.glob("*.md")):
-            try:
-                meta, content = _read_fm(path)
-                roles.append(Role(
-                    id=str(meta["id"]),
-                    name=str(meta["name"]),
-                    emoji=str(meta["emoji"]),
-                    title=str(meta["title"]),
-                    content=content,
-                ))
-            except Exception as e:
-                errors.append(ParseError(file=f"context/roles/{path.name}", error=str(e)))
-        return roles, errors
-
-    def next_id(self) -> str:
-        return _next_id([_fm_id(p) for p in self._dir.glob("*.md")] if self._dir.exists() else [], "role")
-
-    def save(self, role: Role) -> None:
-        self._dir.mkdir(parents=True, exist_ok=True)
-        existing = _find_file_by_id(self._dir, role.id)
-        path = existing or self._dir / f"{role.id}-{_slugify(role.name)}.md"
-        _write_fm(path, {"id": role.id, "name": role.name, "emoji": role.emoji, "title": role.title}, role.content)
-
-    def delete(self, role_id: str) -> bool:
-        path = _find_file_by_id(self._dir, role_id)
-        if path:
-            path.unlink()
-            return True
-        return False
-
-    def find_path(self, role_id: str) -> Path | None:
-        return _find_file_by_id(self._dir, role_id)
-
-
 class MilestoneStore:
     def __init__(self, root: Path) -> None:
         self.root = root
@@ -154,7 +90,6 @@ class MilestoneStore:
                 milestones.append(Milestone(
                     id=str(meta["id"]),
                     title=str(meta["title"]),
-                    role=str(meta.get("role", "")),
                     start_date=str(meta.get("start_date", "")),
                     end_date=str(meta.get("end_date", "")),
                     status=meta.get("status", "active"),
@@ -174,7 +109,6 @@ class MilestoneStore:
         _write_fm(path, {
             "id": ms.id,
             "title": ms.title,
-            "role": ms.role,
             "start_date": ms.start_date,
             "end_date": ms.end_date,
             "status": str(ms.status),
@@ -308,28 +242,19 @@ class NoteStore:
 class ProjectStore:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self.pms = PMSStore(root)
-        self.roles = RoleStore(root)
         self.milestones = MilestoneStore(root)
         self.tasks = TaskStore(root)
         self.notes = NoteStore(root)
 
     def load(self) -> ProjectState:
-        pms, pms_err = self.pms.load()
-        roles, role_errs = self.roles.load_all()
         milestones, ms_errs = self.milestones.load_all()
         tasks, task_errs = self.tasks.load_all()
         notes, note_errs = self.notes.load_all()
-        errors = ([pms_err] if pms_err else []) + role_errs + ms_errs + task_errs + note_errs
-        return ProjectState(pms=pms, roles=roles, milestones=milestones, tasks=tasks, notes=notes, errors=errors)
+        errors = ms_errs + task_errs + note_errs
+        return ProjectState(milestones=milestones, tasks=tasks, notes=notes, errors=errors)
 
     def find_item_path(self, kind: str, item_id: str) -> Path | None:
         match kind:
-            case "pms":
-                p = self.root / "context" / "0-pms.md"
-                return p if p.exists() else None
-            case "role":
-                return self.roles.find_path(item_id)
             case "milestone":
                 return self.milestones.find_path(item_id)
             case "task":
