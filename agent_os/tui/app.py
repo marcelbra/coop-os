@@ -16,7 +16,7 @@ from agent_os.store import ProjectStore
 from agent_os.tui.confirm_delete import ConfirmDeleteScreen
 from agent_os.tui.nav import Nav
 from agent_os.tui.styles import CSS as APP_CSS
-from agent_os.tui.widgets import ContentPanel, DetailTextArea, FixedHeader, NavTree, SelectInput
+from agent_os.tui.widgets import ContentPanel, DetailTextArea, FixedHeader, NavTree, SelectInput, StructuredEditor
 
 
 class AgentOSApp(App[None]):
@@ -157,6 +157,12 @@ class AgentOSApp(App[None]):
     def on_exit_requested(self) -> None:
         self._exit_edit_mode()
 
+    @on(StructuredEditor.Changed)
+    def on_structured_editor_changed(self) -> None:
+        self._save_current()
+        tree = self.query_one(NavTree)
+        tree.populate(self.state, self.root)
+
     @on(SelectInput.ValueSelected)
     def on_select_value_selected(self) -> None:
         self._save_current()
@@ -196,7 +202,7 @@ class AgentOSApp(App[None]):
                 return
             content.show_struct_view(item, self.selected.kind)
 
-    def _show_edit(self) -> None:
+    def _show_edit(self, select_all: bool = False) -> None:
         content = self.query_one(ContentPanel)
         if not self.selected:
             return
@@ -209,7 +215,7 @@ class AgentOSApp(App[None]):
             item = self._item()
             if not item:
                 return
-            content.enter_structured_edit(item, self.selected.kind)
+            content.enter_structured_edit(item, self.selected.kind, select_all=select_all)
 
     # ── Auto-save ─────────────────────────────────────────────────────────────
 
@@ -283,7 +289,7 @@ class AgentOSApp(App[None]):
         tree.populate(self.state, self.root)
         self.selected = Nav(kind, new_item.id, section)
         tree.focus_nav(self.selected)
-        self._show_edit()
+        self._show_edit(select_all=True)
 
     def action_delete_item(self) -> None:
         content = self.query_one(ContentPanel)

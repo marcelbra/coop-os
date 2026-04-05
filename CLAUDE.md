@@ -29,6 +29,8 @@ Use squash merge: `gh pr merge <n> --repo marcelbra/agent-os --squash --delete-b
 
 **Always wait 5 seconds after creating a PR before merging** — GitHub needs a moment to register the PR or pushes may fail. Use `sleep 5` between the `gh pr create` and `gh pr merge` calls.
 
+**Always ask the user to test the changes before creating a PR.** After implementing, prompt the user to verify it works, then wait for confirmation before proceeding to create and merge the PR.
+
 **Always merge immediately after creating a PR.** Don't wait for user confirmation — create the PR and merge it in the same workflow. After merging, switch to main and pull to get a fresh state:
 ```
 git checkout main && git pull origin main

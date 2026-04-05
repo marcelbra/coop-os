@@ -121,8 +121,16 @@ class FieldInput(Input):
             super().__init__()
             self.direction = direction  # -1 = up, +1 = down
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._select_on_next_focus: bool = False
+
     def on_focus(self) -> None:
-        self.call_after_refresh(self.action_home)
+        if self._select_on_next_focus:
+            self._select_on_next_focus = False
+            self.call_after_refresh(self.action_select_all)
+        else:
+            self.call_after_refresh(self.action_home)
 
     def on_key(self, event: Key) -> None:
         if event.key == "up":
@@ -303,6 +311,9 @@ class StructuredEditor(Widget):
     ContentPanel has the ``-editing-struct`` class.
     """
 
+    class Changed(Message):
+        """Posted when focus moves between fields, so the app can save and refresh."""
+
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._kind: str = ""
@@ -381,11 +392,14 @@ class StructuredEditor(Widget):
         ta = self.query_one("#se-body", BodyTextArea)
         ta.read_only = not editable
 
-    def focus_first(self) -> None:
+    def focus_first(self, select_all: bool = False) -> None:
         """Focus the first editable field, falling back to the body."""
         for attr_key, _label, kinds, readonly in FIELD_DEFS:
             if self._kind in kinds and not readonly:
-                self.query_one(f"#se-inp-{attr_key}").focus()
+                inp = self.query_one(f"#se-inp-{attr_key}", FieldInput)
+                if select_all:
+                    inp._select_on_next_focus = True
+                inp.focus()
                 return
         self.query_one("#se-body", BodyTextArea).focus()
 
@@ -421,6 +435,7 @@ class StructuredEditor(Widget):
             self.query_one("#se-body", BodyTextArea).focus()
         else:
             inputs[new_idx].focus()
+        self.post_message(StructuredEditor.Changed())
 
     @property
     def editor_text(self) -> str:
@@ -489,7 +504,7 @@ class ContentPanel(Widget):
         self.remove_class("-editing-struct")
         self.add_class("-view-struct")
 
-    def enter_structured_edit(self, item: Any, kind: str) -> None:
+    def enter_structured_edit(self, item: Any, kind: str, select_all: bool = False) -> None:
         """Structured edit mode for milestone / task / note."""
         se = self.query_one(StructuredEditor)
         se.load(item, kind)
@@ -497,7 +512,7 @@ class ContentPanel(Widget):
         self.remove_class("-editing")
         self.remove_class("-view-struct")
         self.add_class("-editing-struct")
-        se.focus_first()
+        se.focus_first(select_all=select_all)
 
     def clear(self) -> None:
         """Switch to view mode and clear the Markdown content."""
