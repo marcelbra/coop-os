@@ -404,7 +404,7 @@ class NavTree(Tree):
             icon = "•" if not n.scanned else "·"
             notes.add_leaf(truncate_label(f"{icon} {n.title}"), data=Nav("note", n.id, "notes"))
 
-        skills_dir = root / "skills"
+        skills_dir = root / "content" / "skills"
         if skills_dir.exists():
             skills = self.root.add(
                 "Skills",
@@ -414,7 +414,7 @@ class NavTree(Tree):
             for p in sorted(skills_dir.glob("*.md")):
                 skills.add_leaf(truncate_label(p.stem), data=Nav("skill", p.stem, "skills"))
 
-        if (root / "AGENT.md").exists():
+        if (root / "content" / "AGENT.md").exists():
             self.root.add_leaf("AGENT.md", data=Nav("agent", "agent", ""))
 
     def focus_nav(self, nav: Nav) -> None:

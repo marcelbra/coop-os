@@ -18,7 +18,7 @@ Thumbs.db
 .claude/
 
 # Personal data
-context/
-milestones/
-tasks/
-notes/
+content/context/
+content/milestones/
+content/tasks/
+content/notes/

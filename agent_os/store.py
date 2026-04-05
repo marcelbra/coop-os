@@ -77,7 +77,7 @@ def _find_task_dir(tasks_dir: Path, task_id: str) -> Path | None:
 class MilestoneStore:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self._dir = root / "milestones"
+        self._dir = root / "content" / "milestones"
 
     def load_all(self) -> tuple[list[Milestone], list[ParseError]]:
         milestones: list[Milestone] = []
@@ -128,7 +128,7 @@ class MilestoneStore:
 class TaskStore:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self._dir = root / "tasks"
+        self._dir = root / "content" / "tasks"
 
     def load_all(self) -> tuple[list[Task], list[ParseError]]:
         tasks: list[Task] = []
@@ -195,7 +195,7 @@ class TaskStore:
 class NoteStore:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self._dir = root / "notes"
+        self._dir = root / "content" / "notes"
 
     def load_all(self) -> tuple[list[Note], list[ParseError]]:
         notes: list[Note] = []
