@@ -20,6 +20,8 @@ FIELD_DEFS: list[tuple[str, str, frozenset[str], bool]] = [
 ]
 
 DATE_FIELDS: frozenset[str] = frozenset({"start_date", "end_date", "date", "created_date"})
+
+SCANNED_ICONS: dict[str, str] = {"true": "✓", "false": "!"}
 SELECT_FIELDS: frozenset[str] = frozenset({"status", "label", "milestone", "scanned"})
 
 BODY_ATTR: dict[str, str] = {

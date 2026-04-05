@@ -17,6 +17,7 @@ from agent_os.tui.widgets.config import (
     BODY_ATTR,
     DATE_FIELDS,
     FIELD_DEFS,
+    SCANNED_ICONS,
     SELECT_FIELDS,
     AppConfig,
     read_config,
@@ -91,7 +92,8 @@ class StructuredEditor(Widget):
                     elif attr_key == "milestone":
                         options = [""] + milestone_ids
                     else:  # scanned
-                        options = ["true", "false"]
+                        options = list(SCANNED_ICONS.keys())
+                        display = [f"{SCANNED_ICONS[s]} {s}" for s in options]
                     sel = cast(SelectInput, widget)
                     sel.set_options(options, display)
                     sel.value = val

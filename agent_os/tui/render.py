@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import cast
 
 from agent_os.models import Milestone, Note, Task
+from agent_os.tui.widgets.config import SCANNED_ICONS
 
 
 def to_md(item: Milestone | Task | Note, kind: str) -> str:
@@ -35,7 +36,7 @@ def to_md(item: Milestone | Task | Note, kind: str) -> str:
             )
         case "note":
             note = cast(Note, item)
-            scanned = "yes ✓" if note.scanned else "**no ●**"
+            scanned = f"yes {SCANNED_ICONS['true']}" if note.scanned else f"**no {SCANNED_ICONS['false']}**"
             return (
                 f"# {note.title}\n\n"
                 f"| | |\n|:--|:--|\n"

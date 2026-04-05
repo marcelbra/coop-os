@@ -8,7 +8,7 @@ from textual.widgets import Tree
 
 from agent_os.models import ProjectState
 from agent_os.tui.nav import Nav, truncate_label
-from agent_os.tui.widgets.config import read_config
+from agent_os.tui.widgets.config import SCANNED_ICONS, read_config
 
 
 class NavTree(Tree[Nav | None]):
@@ -107,7 +107,7 @@ class NavTree(Tree[Nav | None]):
             "Notes", data=Nav("section", "", "notes"), expand="notes" in expanded
         )
         for n in state.notes:
-            icon = "•" if n.scanned else "·"
+            icon = SCANNED_ICONS["true"] if n.scanned else SCANNED_ICONS["false"]
             notes.add_leaf(truncate_label(f"{icon} {n.title}"), data=Nav("note", n.id, "notes"))
 
         if state.skills:
