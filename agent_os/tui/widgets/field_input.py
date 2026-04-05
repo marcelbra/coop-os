@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from textual.binding import Binding
 from textual.events import Key
 from textual.message import Message
 from textual.widgets import Input
@@ -12,6 +13,10 @@ from agent_os.tui.widgets.text_area import DetailTextArea
 class FieldInput(Input):
     """Input field that navigates between fields (↑/↓) and exits edit mode (←)."""
 
+    BINDINGS = [
+        Binding("super+v", "paste", "Paste", show=False),
+    ]
+
     class Navigate(Message):
         def __init__(self, direction: int) -> None:
             super().__init__()
@@ -20,6 +25,7 @@ class FieldInput(Input):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._select_on_next_focus: bool = False
+        self._escape_prefix: bool = False
 
     def on_focus(self) -> None:
         if self._select_on_next_focus:
@@ -29,6 +35,26 @@ class FieldInput(Input):
             self.call_after_refresh(self.action_home)
 
     def on_key(self, event: Key) -> None:
+        # macOS terminals send option+shift+arrow as ESC followed by a plain
+        # arrow. Track the ESC so the next left/right arrow triggers
+        # word-by-word selection instead of a single character move.
+        if event.key == "escape":
+            self._escape_prefix = True
+            return
+
+        if self._escape_prefix:
+            self._escape_prefix = False
+            if event.key == "left":
+                event.prevent_default()
+                event.stop()
+                self.action_cursor_left_word(True)
+                return
+            elif event.key == "right":
+                event.prevent_default()
+                event.stop()
+                self.action_cursor_right_word(True)
+                return
+
         if event.key == "up":
             event.prevent_default()
             event.stop()
