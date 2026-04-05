@@ -4,7 +4,6 @@ from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
 
 from textual import on, work
 from textual.app import App, ComposeResult
@@ -82,7 +81,8 @@ class AgentOSApp(App[None]):
                 return next((nt for nt in s.notes if nt.id == n.id), None)
             case "skill":
                 return next((sk for sk in s.skills if sk.id == n.id), None)
-        return None
+            case _:
+                return None
 
     def _item_path(self) -> Path | None:
         if not self.selected:
@@ -120,8 +120,8 @@ class AgentOSApp(App[None]):
     # ── Tree navigation ───────────────────────────────────────────────────────
 
     @on(Tree.NodeHighlighted, "#nav")
-    def on_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
-        nav = cast(Nav | None, event.node.data)
+    def on_node_highlighted(self, event: Tree.NodeHighlighted[Nav | None]) -> None:
+        nav = event.node.data
         self._update_footer_hints(nav)
         content = self.query_one(ContentPanel)
         if content.is_editing:
@@ -134,8 +134,8 @@ class AgentOSApp(App[None]):
         self._show_view()
 
     @on(Tree.NodeSelected, "#nav")
-    def on_node_selected(self, event: Tree.NodeSelected) -> None:
-        nav = cast(Nav | None, event.node.data)
+    def on_node_selected(self, event: Tree.NodeSelected[Nav | None]) -> None:
+        nav = event.node.data
         self._update_footer_hints(nav)
         content = self.query_one(ContentPanel)
         if not nav or nav.kind == "section":
@@ -162,12 +162,14 @@ class AgentOSApp(App[None]):
     def on_structured_editor_changed(self) -> None:
         self._save_current()
         tree = self.query_one(NavTree)
+        assert self.state is not None
         tree.populate(self.state, self.root)
 
     @on(SelectInput.ValueSelected)
     def on_select_value_selected(self) -> None:
         self._save_current()
         tree = self.query_one(NavTree)
+        assert self.state is not None
         tree.populate(self.state, self.root)
 
     def _exit_edit_mode(self) -> None:
@@ -179,6 +181,7 @@ class AgentOSApp(App[None]):
         self._show_view()
         self._update_footer_hints(self.selected)
         tree = self.query_one(NavTree)
+        assert self.state is not None
         tree.populate(self.state, self.root)
         tree.focus()
         if self.selected:
@@ -247,11 +250,11 @@ class AgentOSApp(App[None]):
             section = self.selected.section
         else:
             cursor = self.query_one(NavTree).cursor_node
-            nav = cast(Nav | None, cursor.data if cursor else None)
+            nav = cursor.data if cursor else None
             section = nav.section if nav and nav.kind == "section" else "notes"
 
         today = date.today().isoformat()
-        new_item: Milestone | Task | Note
+        new_item: Milestone | Task | Note | Skill
         kind: str
 
         match section:
@@ -342,6 +345,8 @@ class AgentOSApp(App[None]):
                 deleted = self.store.notes.delete(nav.id)
             case "skill":
                 deleted = self.store.skills.delete(nav.id)
+            case _:
+                pass
         if deleted:
             self.selected = next_nav if next_nav and next_nav.kind != "section" else None
             self._reload()

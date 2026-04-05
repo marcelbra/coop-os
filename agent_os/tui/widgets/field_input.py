@@ -24,12 +24,12 @@ class FieldInput(Input):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._select_on_next_focus: bool = False
+        self.select_on_next_focus: bool = False
         self._escape_prefix: bool = False
 
     def on_focus(self) -> None:
-        if self._select_on_next_focus:
-            self._select_on_next_focus = False
+        if self.select_on_next_focus:
+            self.select_on_next_focus = False
             self.call_after_refresh(self.action_select_all)
         else:
             self.call_after_refresh(self.action_home)

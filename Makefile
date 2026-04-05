@@ -3,8 +3,9 @@
 install:  ## Install project dependencies
 	uv sync --group dev
 
-lint:  ## Check for linting errors
+lint:  ## Check for linting and type errors
 	uv run ruff check agent_os
+	uv run basedpyright agent_os
 
 format:  ## Format the code
 	uv run ruff format agent_os

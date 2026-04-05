@@ -43,7 +43,7 @@ class AppConfig:
         self.label = label
 
 
-def _read_config(root: Path) -> AppConfig:
+def read_config(root: Path) -> AppConfig:
     """Parse config.yml into an AppConfig. No external YAML library needed."""
     config_path = root / "config.yml"
     task_statuses: dict[str, str] = {}

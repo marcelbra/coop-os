@@ -42,12 +42,12 @@ class CalendarWidget(Widget):
         base = initial or _date.today()
         self._year: int = base.year
         self._month: int = base.month
-        self._attr_key: str = attr_key
+        self.attr_key: str = attr_key
         self._mode: str = "cal"         # "cal" | "month" | "year"
         self._drop_cursor: int = 0
         # ("header", col) where col: 0=<  1=month  2=year  3=>
         # ("day", row, col) where row/col index the day grid
-        self._focus: tuple = ("header", 0)
+        self._focus: tuple[Any, ...] = ("header", 0)
         if initial and initial.year == self._year and initial.month == self._month:
             self._init_focus(initial)
 

@@ -20,7 +20,7 @@ def to_md(item: Milestone | Task | Note, kind: str) -> str:
             )
         case "task":
             task = cast(Task, item)
-            labels = ", ".join(task.labels) if task.labels else "—"
+            labels = task.label if task.label else "—"
             deps = ", ".join(task.dependencies) if task.dependencies else "—"
             return (
                 f"# {task.title}\n\n"
@@ -44,4 +44,6 @@ def to_md(item: Milestone | Task | Note, kind: str) -> str:
                 f"| scanned | {scanned} |\n\n"
                 f"---\n\n{note.content}"
             )
+        case _:
+            pass
     return ""

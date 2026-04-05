@@ -46,13 +46,13 @@ Use the Makefile for common tasks:
 
 | Command | Purpose |
 |---------|---------|
-| `make lint` | Check for linting errors |
+| `make lint` | Check for linting and type errors (ruff + basedpyright) |
 | `make fix` | Auto-fix linting errors |
 | `make format` | Format code |
 | `make run` | Start the TUI |
 | `make install` | Install dependencies |
 
-Always run `make lint` after making changes. Use `make fix` to auto-resolve import ordering and other fixable issues.
+Always run `make lint` after making changes — it runs both ruff (style) and basedpyright (types). Use `make fix` to auto-resolve import ordering and other fixable issues.
 
 ## Development Mode
 

@@ -8,7 +8,7 @@ from agent_os.tui.widgets.config import (
     FIELD_DEFS,
     SELECT_FIELDS,
     AppConfig,
-    _read_config,
+    read_config,
 )
 from agent_os.tui.widgets.content_panel import ContentPanel
 from agent_os.tui.widgets.date_field_input import DateFieldInput
@@ -35,5 +35,5 @@ __all__ = [
     "SELECT_FIELDS",
     "SelectInput",
     "StructuredEditor",
-    "_read_config",
+    "read_config",
 ]

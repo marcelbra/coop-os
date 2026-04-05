@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date as _date
-from typing import Any
+from typing import Any, cast
 
 import frontmatter as _fm
 from textual import on
@@ -19,7 +19,7 @@ from agent_os.tui.widgets.config import (
     FIELD_DEFS,
     SELECT_FIELDS,
     AppConfig,
-    _read_config,
+    read_config,
 )
 from agent_os.tui.widgets.date_field_input import DateFieldInput
 from agent_os.tui.widgets.field_input import FieldInput
@@ -60,7 +60,7 @@ class StructuredEditor(Widget):
         self._kind = kind
 
         root = getattr(self.app, "root", None)
-        cfg = _read_config(root) if root else AppConfig({}, {}, [])
+        cfg = read_config(root) if root else AppConfig({}, {}, [])
         state: ProjectState | None = getattr(self.app, "state", None)
         milestone_ids = [m.id for m in state.milestones] if state else []
 
@@ -92,10 +92,11 @@ class StructuredEditor(Widget):
                         options = [""] + milestone_ids
                     else:  # scanned
                         options = ["true", "false"]
-                    widget.set_options(options, display)  # type: ignore[union-attr]
-                    widget.value = val  # type: ignore[union-attr]
+                    sel = cast(SelectInput, widget)
+                    sel.set_options(options, display)
+                    sel.value = val
                 else:
-                    widget.value = val  # type: ignore[union-attr]
+                    cast(FieldInput, widget).value = val
 
         has_visible_fields = any(kind in kinds for _, _, kinds, _ in FIELD_DEFS)
         self.query_one("#se-sep", Rule).display = has_visible_fields
@@ -128,7 +129,7 @@ class StructuredEditor(Widget):
             if self._kind in kinds and not readonly:
                 inp = self.query_one(f"#se-inp-{attr_key}", FieldInput)
                 if select_all:
-                    inp._select_on_next_focus = True
+                    inp.select_on_next_focus = True
                 inp.focus()
                 return
         self.query_one("#se-body", BodyTextArea).focus()
@@ -154,7 +155,7 @@ class StructuredEditor(Widget):
             return
         focused = self.app.focused
         try:
-            idx = inputs.index(focused)  # type: ignore[arg-type]
+            idx = inputs.index(cast(Widget, focused))
         except ValueError:
             # Came from BodyTextArea going up — focus last field
             if event.direction == -1:
@@ -180,7 +181,7 @@ class StructuredEditor(Widget):
             initial = None
             if event.attr_key == "end_date":
                 try:
-                    start_val = self.query_one("#se-inp-start_date").value.strip()  # type: ignore[union-attr]
+                    start_val = cast(FieldInput, self.query_one("#se-inp-start_date")).value.strip()
                     initial = _date.fromisoformat(start_val)
                 except Exception:
                     pass
@@ -193,11 +194,11 @@ class StructuredEditor(Widget):
     def _on_cal_date_selected(self, event: CalendarWidget.DateSelected) -> None:
         event.stop()
         for cal in list(self.query(CalendarWidget)):
-            attr_key = cal._attr_key
+            attr_key = cal.attr_key
             cal.remove()
             if attr_key:
                 inp = self.query_one(f"#se-inp-{attr_key}")
-                inp.value = event.date.isoformat()  # type: ignore[union-attr]
+                cast(FieldInput, inp).value = event.date.isoformat()
                 inp.focus()
         self.post_message(StructuredEditor.Changed())
 
@@ -205,7 +206,7 @@ class StructuredEditor(Widget):
     def _on_cal_dismissed(self, event: CalendarWidget.Dismissed) -> None:
         event.stop()
         for cal in list(self.query(CalendarWidget)):
-            attr_key = cal._attr_key
+            attr_key = cal.attr_key
             cal.remove()
             if attr_key:
                 try:
@@ -225,7 +226,7 @@ class StructuredEditor(Widget):
             if self._kind not in kinds:
                 continue
             widget = self.query_one(f"#se-inp-{attr_key}")
-            val_str = widget.value.strip()  # type: ignore[union-attr]
+            val_str = cast(FieldInput, widget).value.strip()
             if attr_key == "scanned":
                 meta[attr_key] = val_str.lower() in ("true", "yes", "1")
             else:

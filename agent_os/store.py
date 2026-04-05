@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import shutil
 from pathlib import Path
+from typing import Any
 
 import frontmatter
 
@@ -37,12 +38,12 @@ def _next_id(ids: list[str], prefix: str) -> str:
     return f"{prefix}-{max(nums, default=0) + 1}"
 
 
-def _read_fm(path: Path) -> tuple[dict, str]:
+def _read_fm(path: Path) -> tuple[dict[str, Any], str]:
     post = frontmatter.load(str(path))
     return dict(post.metadata), post.content
 
 
-def _write_fm(path: Path, metadata: dict, content: str) -> None:
+def _write_fm(path: Path, metadata: dict[str, Any], content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     post = frontmatter.Post(content, **metadata)
     path.write_text(frontmatter.dumps(post), encoding="utf-8")
@@ -169,7 +170,7 @@ class TaskStore:
         existing_dir = _find_task_dir(self._dir, task.id)
         task_dir = existing_dir or self._dir / f"{task.id}-{_slugify(task.title)}"
         task_dir.mkdir(parents=True, exist_ok=True)
-        meta: dict = {
+        meta: dict[str, Any] = {
             "id": task.id,
             "title": task.title,
             "status": str(task.status),
@@ -308,4 +309,5 @@ class ProjectStore:
                 return self.notes.find_path(item_id)
             case "skill":
                 return self.skills.find_path(item_id)
-        return None
+            case _:
+                return None

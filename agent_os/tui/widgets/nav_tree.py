@@ -8,10 +8,10 @@ from textual.widgets import Tree
 
 from agent_os.models import ProjectState
 from agent_os.tui.nav import Nav, truncate_label
-from agent_os.tui.widgets.config import _read_config
+from agent_os.tui.widgets.config import read_config
 
 
-class NavTree(Tree):
+class NavTree(Tree[Nav | None]):
     """File tree widget.  Owns navigation state; communicates via messages."""
 
     class EditRequested(Message):
@@ -81,7 +81,7 @@ class NavTree(Tree):
         }
         self.clear()
 
-        cfg = _read_config(root)
+        cfg = read_config(root)
 
         ms = self.root.add(
             "Milestones",
