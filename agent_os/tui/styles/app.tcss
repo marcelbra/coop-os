@@ -64,10 +64,6 @@ ContentPanel .cp-viewer {
     height: 1fr;
     min-height: 8;
     margin: 1 3;
-    scrollbar-color: #161b22;
-    scrollbar-background: #161b22;
-    scrollbar-color-hover: #161b22;
-    scrollbar-background-hover: #161b22;
 }
 
 .cp-raw-editor:focus {
