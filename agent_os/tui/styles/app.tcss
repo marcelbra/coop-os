@@ -173,3 +173,19 @@ StructuredEditor DetailTextArea:focus {
     border: none;
     background: transparent;
 }
+
+/* ── CalendarWidget ───────────────────────────────────────────────────────── */
+
+CalendarWidget {
+    margin-left: 12;
+    width: 24;
+    background: #161b22;
+    border-left: heavy #58a6ff;
+    color: #c9d1d9;
+    padding: 0 1;
+    margin-bottom: 0;
+}
+
+CalendarWidget:focus {
+    border-left: heavy #58a6ff;
+}
