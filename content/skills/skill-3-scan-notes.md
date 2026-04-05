@@ -1,6 +1,7 @@
-# /scan-notes
-
-Triggered by: `/scan-notes`
+---
+id: skill-3
+command: /scan-notes
+---
 
 ## Steps
 

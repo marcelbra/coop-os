@@ -19,6 +19,7 @@ from agent_os.tui.nav import Nav, truncate_label
 # (attr_key, display_label, visible_for_kinds, readonly)
 FIELD_DEFS: list[tuple[str, str, frozenset[str], bool]] = [
     ("title",        "title",      frozenset({"milestone", "task", "note"}),                False),
+    ("command",      "command",    frozenset({"skill"}),                                    False),
     ("date",         "date",       frozenset({"note"}),                                     False),
     ("scanned",      "scanned",    frozenset({"note"}),                                     False),
     ("start_date",   "start date", frozenset({"milestone"}),                                False),
@@ -28,13 +29,14 @@ FIELD_DEFS: list[tuple[str, str, frozenset[str], bool]] = [
     ("labels",       "labels",     frozenset({"task"}),                                     False),
     ("dependencies", "depends on", frozenset({"task"}),                                     False),
     ("created_date", "created",    frozenset({"task"}),                                     False),
-    ("id",           "id",         frozenset({"milestone", "task", "note"}),                True),
+    ("id",           "id",         frozenset({"milestone", "task", "note", "skill"}),       True),
 ]
 
 BODY_ATTR: dict[str, str] = {
     "milestone": "description",
     "task": "description",
     "note": "content",
+    "skill": "content",
 }
 
 
@@ -404,15 +406,14 @@ class NavTree(Tree):
             icon = "•" if not n.scanned else "·"
             notes.add_leaf(truncate_label(f"{icon} {n.title}"), data=Nav("note", n.id, "notes"))
 
-        skills_dir = root / "content" / "skills"
-        if skills_dir.exists():
+        if state.skills:
             skills = self.root.add(
                 "Skills",
                 data=Nav("section", "", "skills"),
                 expand="skills" in expanded,
             )
-            for p in sorted(skills_dir.glob("*.md")):
-                skills.add_leaf(truncate_label(p.stem), data=Nav("skill", p.stem, "skills"))
+            for s in state.skills:
+                skills.add_leaf(truncate_label(s.command), data=Nav("skill", s.id, "skills"))
 
         if (root / "content" / "AGENT.md").exists():
             self.root.add_leaf("AGENT.md", data=Nav("agent", "agent", ""))

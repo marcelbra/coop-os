@@ -11,7 +11,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import Footer, Tree
 
-from agent_os.models import Milestone, Note, ProjectState, Task
+from agent_os.models import Milestone, Note, ProjectState, Skill, Task
 from agent_os.store import ProjectStore
 from agent_os.tui.confirm_delete import ConfirmDeleteScreen
 from agent_os.tui.nav import Nav
@@ -67,7 +67,7 @@ class AgentOSApp(App[None]):
                 timeout=4,
             )
 
-    def _item(self) -> Milestone | Task | Note | None:
+    def _item(self) -> Milestone | Task | Note | Skill | None:
         n = self.selected
         if not n or not self.state:
             return None
@@ -79,6 +79,8 @@ class AgentOSApp(App[None]):
                 return next((t for t in s.tasks if t.id == n.id), None)
             case "note":
                 return next((nt for nt in s.notes if nt.id == n.id), None)
+            case "skill":
+                return next((sk for sk in s.skills if sk.id == n.id), None)
         return None
 
     def _item_path(self) -> Path | None:
@@ -86,8 +88,6 @@ class AgentOSApp(App[None]):
             return None
         if self.selected.kind == "agent":
             return self.root / "content" / "AGENT.md"
-        if self.selected.kind == "skill":
-            return self.root / "content" / "skills" / f"{self.selected.id}.md"
         return self.store.find_item_path(self.selected.kind, self.selected.id)
 
     def _update_footer_hints(self, nav: Nav | None) -> None:
@@ -104,7 +104,7 @@ class AgentOSApp(App[None]):
         show_delete = (
             not content.is_editing
             and nav is not None
-            and nav.kind in ("milestone", "task", "note")
+            and nav.kind in ("milestone", "task", "note", "skill")
         )
         for key, action, show in (
             ("n", "new_item", show_new),
@@ -176,7 +176,7 @@ class AgentOSApp(App[None]):
         content = self.query_one(ContentPanel)
         if content.is_editing:
             return
-        if self.selected.kind in ("agent", "skill"):
+        if self.selected.kind == "agent":
             path = self._item_path()
             md = path.read_text(encoding="utf-8") if path and path.exists() else ""
             await content.show_view(md)
@@ -190,7 +190,7 @@ class AgentOSApp(App[None]):
         content = self.query_one(ContentPanel)
         if not self.selected:
             return
-        if self.selected.kind in ("agent", "skill"):
+        if self.selected.kind == "agent":
             path = self._item_path()
             if not path or not path.exists():
                 return
@@ -222,7 +222,7 @@ class AgentOSApp(App[None]):
         content = self.query_one(ContentPanel)
         if content.is_editing or not self.state:
             return
-        if self.selected and self.selected.kind in ("agent", "skill"):
+        if self.selected and self.selected.kind == "agent":
             return
 
         if self.selected:
@@ -254,6 +254,13 @@ class AgentOSApp(App[None]):
                 )
                 self.store.tasks.save(new_item)
                 kind = "task"
+            case "skills":
+                new_item = Skill(
+                    id=self.store.skills.next_id(),
+                    command="new-skill",
+                )
+                self.store.skills.save(new_item)
+                kind = "skill"
             case _:
                 new_item = Note(
                     id=self.store.notes.next_id(), title="New Note", date=today
@@ -273,7 +280,7 @@ class AgentOSApp(App[None]):
         if (
             content.is_editing
             or not self.selected
-            or self.selected.kind in ("section", "agent", "skill")
+            or self.selected.kind in ("section", "agent")
         ):
             return
         nav = self.selected
@@ -315,6 +322,8 @@ class AgentOSApp(App[None]):
                 deleted = self.store.tasks.delete(nav.id)
             case "note":
                 deleted = self.store.notes.delete(nav.id)
+            case "skill":
+                deleted = self.store.skills.delete(nav.id)
         if deleted:
             self.selected = next_nav if next_nav and next_nav.kind != "section" else None
             self._reload()

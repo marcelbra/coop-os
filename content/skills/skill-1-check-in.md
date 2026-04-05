@@ -1,6 +1,7 @@
-# /check-in
-
-Triggered by: `/check-in`
+---
+id: skill-1
+command: /check-in
+---
 
 ## Steps
 

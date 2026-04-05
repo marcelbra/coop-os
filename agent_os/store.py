@@ -11,6 +11,7 @@ from agent_os.models import (
     Note,
     ParseError,
     ProjectState,
+    Skill,
     Task,
 )
 
@@ -236,6 +237,48 @@ class NoteStore:
         return _find_file_by_id(self._dir, note_id)
 
 
+class SkillStore:
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self._dir = root / "content" / "skills"
+
+    def load_all(self) -> tuple[list[Skill], list[ParseError]]:
+        skills: list[Skill] = []
+        errors: list[ParseError] = []
+        if not self._dir.exists():
+            return skills, errors
+        for path in sorted(self._dir.glob("*.md")):
+            try:
+                meta, content = _read_fm(path)
+                skills.append(Skill(
+                    id=str(meta["id"]),
+                    command=str(meta["command"]),
+                    content=content,
+                ))
+            except Exception as e:
+                errors.append(ParseError(file=f"content/skills/{path.name}", error=str(e)))
+        return skills, errors
+
+    def next_id(self) -> str:
+        return _next_id([_fm_id(p) for p in self._dir.glob("*.md")] if self._dir.exists() else [], "skill")
+
+    def save(self, skill: Skill) -> None:
+        self._dir.mkdir(parents=True, exist_ok=True)
+        existing = _find_file_by_id(self._dir, skill.id)
+        path = existing or self._dir / f"{skill.id}-{_slugify(skill.command)}.md"
+        _write_fm(path, {"id": skill.id, "command": skill.command}, skill.content)
+
+    def delete(self, skill_id: str) -> bool:
+        path = _find_file_by_id(self._dir, skill_id)
+        if path:
+            path.unlink()
+            return True
+        return False
+
+    def find_path(self, skill_id: str) -> Path | None:
+        return _find_file_by_id(self._dir, skill_id)
+
+
 # ── Project store ─────────────────────────────────────────────────────────────
 
 
@@ -245,13 +288,15 @@ class ProjectStore:
         self.milestones = MilestoneStore(root)
         self.tasks = TaskStore(root)
         self.notes = NoteStore(root)
+        self.skills = SkillStore(root)
 
     def load(self) -> ProjectState:
         milestones, ms_errs = self.milestones.load_all()
         tasks, task_errs = self.tasks.load_all()
         notes, note_errs = self.notes.load_all()
-        errors = ms_errs + task_errs + note_errs
-        return ProjectState(milestones=milestones, tasks=tasks, notes=notes, errors=errors)
+        skills, skill_errs = self.skills.load_all()
+        errors = ms_errs + task_errs + note_errs + skill_errs
+        return ProjectState(milestones=milestones, tasks=tasks, notes=notes, skills=skills, errors=errors)
 
     def find_item_path(self, kind: str, item_id: str) -> Path | None:
         match kind:
@@ -261,4 +306,6 @@ class ProjectStore:
                 return self.tasks.find_path(item_id)
             case "note":
                 return self.notes.find_path(item_id)
+            case "skill":
+                return self.skills.find_path(item_id)
         return None

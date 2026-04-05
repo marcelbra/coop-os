@@ -47,6 +47,12 @@ class Note(BaseModel):
     content: str = ""
 
 
+class Skill(BaseModel):
+    id: str
+    command: str
+    content: str = ""
+
+
 class ParseError(BaseModel):
     file: str
     error: str
@@ -56,4 +62,5 @@ class ProjectState(BaseModel):
     milestones: list[Milestone] = []
     tasks: list[Task] = []
     notes: list[Note] = []
+    skills: list[Skill] = []
     errors: list[ParseError] = []

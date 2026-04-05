@@ -1,6 +1,7 @@
-# /weekly-review
-
-Triggered by: `/weekly-review`
+---
+id: skill-4
+command: /weekly-review
+---
 
 Best done: Sunday evening or Friday afternoon.
 

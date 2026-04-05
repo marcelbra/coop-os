@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_os.models import Milestone, Note, ParseError, ProjectState, Task
+from agent_os.models import Milestone, Note, ParseError, ProjectState, Skill, Task
 from agent_os.store import ProjectStore
 
 
@@ -61,3 +61,19 @@ def next_task_id(root: Path) -> str:
 
 def next_note_id(root: Path) -> str:
     return ProjectStore(root).notes.next_id()
+
+
+def read_skills(root: Path) -> tuple[list[Skill], list[ParseError]]:
+    return ProjectStore(root).skills.load_all()
+
+
+def write_skill(root: Path, skill: Skill) -> None:
+    ProjectStore(root).skills.save(skill)
+
+
+def delete_skill(root: Path, skill_id: str) -> bool:
+    return ProjectStore(root).skills.delete(skill_id)
+
+
+def next_skill_id(root: Path) -> str:
+    return ProjectStore(root).skills.next_id()

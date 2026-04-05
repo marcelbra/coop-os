@@ -27,6 +27,8 @@
 
 Use squash merge: `gh pr merge <n> --repo marcelbra/agent-os --squash --delete-branch`
 
+**Always merge immediately after creating a PR.** Don't wait for user confirmation — create the PR and merge it in the same workflow.
+
 ### What belongs in separate PRs
 
 Split into distinct PRs when changes touch different concerns (e.g. a feature in one file and a bug fix in another, or code changes vs. docs/skills cleanup). Combine when changes are tightly coupled and make no sense apart.

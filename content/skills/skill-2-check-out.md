@@ -1,6 +1,7 @@
-# /check-out
-
-Triggered by: `/check-out`
+---
+id: skill-2
+command: /check-out
+---
 
 ## Steps
 
