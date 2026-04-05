@@ -79,7 +79,7 @@ def _find_task_dir(tasks_dir: Path, task_id: str) -> Path | None:
 class MilestoneStore:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self._dir = root / "content" / "milestones"
+        self._dir = root / "agent_os" / "content" / "milestones"
 
     def load_all(self) -> tuple[list[Milestone], list[ParseError]]:
         milestones: list[Milestone] = []
@@ -130,7 +130,7 @@ class MilestoneStore:
 class TaskStore:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self._dir = root / "content" / "tasks"
+        self._dir = root / "agent_os" / "content" / "tasks"
 
     def load_all(self) -> tuple[list[Task], list[ParseError]]:
         tasks: list[Task] = []
@@ -197,7 +197,7 @@ class TaskStore:
 class NoteStore:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self._dir = root / "content" / "notes"
+        self._dir = root / "agent_os" / "content" / "notes"
 
     def load_all(self) -> tuple[list[Note], list[ParseError]]:
         notes: list[Note] = []
@@ -241,7 +241,7 @@ class NoteStore:
 class SkillStore:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self._dir = root / "content" / "skills"
+        self._dir = root / "agent_os" / "content" / "skills"
 
     def load_all(self) -> tuple[list[Skill], list[ParseError]]:
         skills: list[Skill] = []
@@ -257,7 +257,7 @@ class SkillStore:
                     content=content,
                 ))
             except Exception as e:
-                errors.append(ParseError(file=f"content/skills/{path.name}", error=str(e)))
+                errors.append(ParseError(file=f"agent_os/content/skills/{path.name}", error=str(e)))
         return skills, errors
 
     def next_id(self) -> str:
