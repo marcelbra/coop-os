@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from agent_os.models import Milestone, Note, Task
+from agent_os.backend.models import Milestone, Note, Task
 from agent_os.tui.widgets.config import SCANNED_ICONS
 
 

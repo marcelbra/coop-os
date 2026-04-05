@@ -11,8 +11,8 @@ from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import Footer, Tree
 
-from agent_os.models import Milestone, Note, ProjectState, Skill, Task
-from agent_os.store import ProjectStore
+from agent_os.backend.models import Milestone, Note, ProjectState, Skill, Task
+from agent_os.backend.store import ProjectStore
 from agent_os.tui.confirm_delete import ConfirmDeleteScreen
 from agent_os.tui.nav import Nav
 from agent_os.tui.styles import CSS as APP_CSS

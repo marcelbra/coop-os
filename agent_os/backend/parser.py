@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_os.models import Milestone, Note, ParseError, ProjectState, Skill, Task
-from agent_os.store import ProjectStore
+from agent_os.backend.models import Milestone, Note, ParseError, ProjectState, Skill, Task
+from agent_os.backend.store import ProjectStore
 
 
 def read_project(root: Path) -> ProjectState:

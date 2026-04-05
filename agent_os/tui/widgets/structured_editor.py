@@ -10,7 +10,7 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Label, Rule
 
-from agent_os.models import ProjectState
+from agent_os.backend.models import ProjectState
 from agent_os.tui.widgets.body_text_area import BodyTextArea
 from agent_os.tui.widgets.calendar import CalendarWidget
 from agent_os.tui.widgets.config import (

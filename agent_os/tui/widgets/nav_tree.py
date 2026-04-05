@@ -6,7 +6,7 @@ from textual.events import Click, Key, MouseDown
 from textual.message import Message
 from textual.widgets import Tree
 
-from agent_os.models import ProjectState
+from agent_os.backend.models import ProjectState
 from agent_os.tui.nav import Nav, truncate_label
 from agent_os.tui.widgets.config import SCANNED_ICONS, read_config
 

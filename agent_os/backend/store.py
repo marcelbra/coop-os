@@ -7,7 +7,7 @@ from typing import Any
 
 import frontmatter
 
-from agent_os.models import (
+from agent_os.backend.models import (
     Milestone,
     Note,
     ParseError,
