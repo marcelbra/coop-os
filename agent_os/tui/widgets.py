@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date as _date
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,8 @@ FIELD_DEFS: list[tuple[str, str, frozenset[str], bool]] = [
     ("created_date", "created",    frozenset({"task"}),                                     False),
     ("id",           "id",         frozenset({"milestone", "task", "note", "skill"}),       True),
 ]
+
+DATE_FIELDS: frozenset[str] = frozenset({"start_date", "end_date", "date", "created_date"})
 
 BODY_ATTR: dict[str, str] = {
     "milestone": "description",
@@ -90,6 +93,32 @@ class FieldInput(Input):
             self.post_message(DetailTextArea.ExitRequested())
 
 
+class DateFieldInput(FieldInput):
+    """FieldInput with ISO date (YYYY-MM-DD) validation. Reverts on bad input."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._prev_value: str = ""
+
+    def on_focus(self) -> None:
+        super().on_focus()
+        self._prev_value = self.value
+
+    def on_blur(self) -> None:
+        val = self.value.strip()
+        if not val:
+            return
+        try:
+            _date.fromisoformat(val)
+        except ValueError:
+            self.app.notify(
+                f'Invalid date "{val}" — expected YYYY-MM-DD',
+                severity="error",
+                timeout=4,
+            )
+            self.value = self._prev_value
+
+
 class BodyTextArea(DetailTextArea):
     """Body textarea: cursor line only highlighted when focused; ↑ at row 0 moves to fields."""
 
@@ -127,7 +156,8 @@ class StructuredEditor(Widget):
         for attr_key, label, _kinds, readonly in FIELD_DEFS:
             with Horizontal(classes="se-row", id=f"se-row-{attr_key}"):
                 yield Label(label, classes="se-label")
-                yield FieldInput(id=f"se-inp-{attr_key}", disabled=readonly)
+                cls = DateFieldInput if attr_key in DATE_FIELDS else FieldInput
+                yield cls(id=f"se-inp-{attr_key}", disabled=readonly)
         yield Rule(classes="se-sep")
         yield BodyTextArea("", id="se-body", language="markdown", theme="vscode_dark")
 
