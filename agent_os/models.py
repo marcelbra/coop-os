@@ -33,7 +33,7 @@ class Task(BaseModel):
     title: str
     status: TaskStatus = TaskStatus.TODO
     milestone: str | None = None
-    labels: list[str] = []
+    label: str = ""
     dependencies: list[str] = []
     created_date: str = ""
     description: str = ""

@@ -1,10 +1,16 @@
-statuses: 
-  - to do
-  - in progress
-  - waiting
-  - done
-  - cancelled
-labels:
+task_statuses:
+  todo: "○"
+  in_progress: "◉"
+  waiting: "…"
+  done: "✓"
+  cancelled: "✗"
+
+milestone_statuses:
+  active: "•"
+  completed: "✓"
+  cancelled: "✗"
+
+label:
   - health
   - jobs
   - finances

@@ -131,6 +131,29 @@ ContentPanel.-editing-struct StructuredEditor { display: block; }
     background: transparent;
 }
 
+/* Select dropdown fields */
+.se-row SelectInput {
+    height: 1;
+    background: transparent;
+    color: #c9d1d9;
+    padding: 0;
+    width: 1fr;
+}
+
+.se-row SelectInput:focus {
+    background: #161b22;
+}
+
+.se-row SelectInput:disabled {
+    color: #4d5158;
+    background: transparent;
+}
+
+.se-row SelectInput.se-view-disabled:disabled {
+    color: #c9d1d9;
+    background: transparent;
+}
+
 /* Separator between fields and body */
 .se-sep {
     color: #30363d;

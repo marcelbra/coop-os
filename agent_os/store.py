@@ -148,7 +148,7 @@ class TaskStore:
                     title=str(meta["title"]),
                     status=meta.get("status", "todo"),
                     milestone=str(meta["milestone"]) if meta.get("milestone") else None,
-                    labels=list(meta.get("labels", [])),
+                    label=str(meta.get("label", "")),
                     dependencies=[str(d) for d in meta.get("dependencies", [])],
                     created_date=str(meta.get("created_date", "")),
                     description=content,
@@ -174,7 +174,7 @@ class TaskStore:
             "title": task.title,
             "status": str(task.status),
             "created_date": task.created_date,
-            "labels": task.labels,
+            "label": task.label,
             "dependencies": task.dependencies,
         }
         if task.milestone:

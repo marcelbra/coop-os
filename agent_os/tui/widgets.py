@@ -27,13 +27,13 @@ FIELD_DEFS: list[tuple[str, str, frozenset[str], bool]] = [
     ("end_date",     "end date",   frozenset({"milestone"}),                                False),
     ("status",       "status",     frozenset({"milestone", "task"}),                        False),
     ("milestone",    "milestone",  frozenset({"task"}),                                     False),
-    ("labels",       "labels",     frozenset({"task"}),                                     False),
-    ("dependencies", "depends on", frozenset({"task"}),                                     False),
+    ("label",        "label",      frozenset({"task"}),                                     False),
     ("created_date", "created",    frozenset({"task"}),                                     False),
     ("id",           "id",         frozenset({"milestone", "task", "note", "skill"}),       True),
 ]
 
 DATE_FIELDS: frozenset[str] = frozenset({"start_date", "end_date", "date", "created_date"})
+SELECT_FIELDS: frozenset[str] = frozenset({"status", "label", "milestone", "scanned"})
 
 BODY_ATTR: dict[str, str] = {
     "milestone": "description",
@@ -41,6 +41,52 @@ BODY_ATTR: dict[str, str] = {
     "note": "content",
     "skill": "content",
 }
+
+
+class AppConfig:
+    def __init__(
+        self,
+        task_statuses: dict[str, str],
+        milestone_statuses: dict[str, str],
+        label: list[str],
+    ) -> None:
+        self.task_statuses = task_statuses        # value -> icon
+        self.milestone_statuses = milestone_statuses
+        self.label = label
+
+
+def _read_config(root: Path) -> AppConfig:
+    """Parse config.yml into an AppConfig. No external YAML library needed."""
+    config_path = root / "config.yml"
+    task_statuses: dict[str, str] = {}
+    milestone_statuses: dict[str, str] = {}
+    label: list[str] = []
+
+    if not config_path.exists():
+        return AppConfig(task_statuses, milestone_statuses, label)
+
+    section: str | None = None
+    for line in config_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped == "task_statuses:":
+            section = "task_statuses"
+        elif stripped == "milestone_statuses:":
+            section = "milestone_statuses"
+        elif stripped == "label:":
+            section = "label"
+        elif stripped.startswith("- ") and section == "label":
+            label.append(stripped[2:].strip())
+        elif ": " in stripped and section in ("task_statuses", "milestone_statuses"):
+            key, _, val = stripped.partition(": ")
+            icon = val.strip().strip('"')
+            if section == "task_statuses":
+                task_statuses[key.strip()] = icon
+            else:
+                milestone_statuses[key.strip()] = icon
+
+    return AppConfig(task_statuses, milestone_statuses, label)
 
 
 class FixedHeader(Header):
@@ -119,6 +165,115 @@ class DateFieldInput(FieldInput):
             self.value = self._prev_value
 
 
+class SelectInput(Widget):
+    """Single-line selectable field; Enter opens an inline option list."""
+
+    can_focus = True
+
+    class ValueSelected(Message):
+        """Posted after the user confirms a selection from the dropdown."""
+
+    def __init__(self, options: list[str] | None = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._options: list[str] = options or []
+        self._display: list[str] = list(self._options)
+        self._value: str = ""
+        self._open: bool = False
+        self._cursor: int = 0
+
+    @property
+    def value(self) -> str:
+        return self._value
+
+    @value.setter
+    def value(self, v: str) -> None:
+        self._value = v
+        self.refresh()
+
+    def set_options(self, options: list[str], display: list[str] | None = None) -> None:
+        self._options = options
+        self._display = display if display is not None else list(options)
+
+    def render(self) -> str:
+        if not self._open:
+            try:
+                return self._display[self._options.index(self._value)]
+            except (ValueError, IndexError):
+                return self._value
+        lines = []
+        for i, disp in enumerate(self._display):
+            prefix = "> " if i == self._cursor else "  "
+            lines.append(f"{prefix}{disp}")
+        return "\n".join(lines)
+
+    def _open_dropdown(self) -> None:
+        self._open = True
+        try:
+            self._cursor = self._options.index(self._value.strip())
+        except ValueError:
+            self._cursor = 0
+        n = max(len(self._options), 1)
+        if self.parent:
+            self.parent.styles.height = n
+        self.styles.height = n
+        self.refresh()
+
+    def _close_dropdown(self) -> None:
+        self._open = False
+        if self.parent:
+            self.parent.styles.height = 1
+        self.styles.height = 1
+        self.refresh()
+
+    def on_key(self, event: Key) -> None:
+        if self.disabled:
+            return
+        if not self._open:
+            if event.key == "enter":
+                event.prevent_default()
+                event.stop()
+                if self._options:
+                    self._open_dropdown()
+            elif event.key == "up":
+                event.prevent_default()
+                event.stop()
+                self.post_message(FieldInput.Navigate(-1))
+            elif event.key == "down":
+                event.prevent_default()
+                event.stop()
+                self.post_message(FieldInput.Navigate(+1))
+            elif event.key == "left":
+                event.prevent_default()
+                event.stop()
+                self.post_message(DetailTextArea.ExitRequested())
+        else:
+            if event.key == "up":
+                event.prevent_default()
+                event.stop()
+                self._cursor = max(0, self._cursor - 1)
+                self.refresh()
+            elif event.key == "down":
+                event.prevent_default()
+                event.stop()
+                self._cursor = min(len(self._options) - 1, self._cursor + 1)
+                self.refresh()
+            elif event.key == "enter":
+                event.prevent_default()
+                event.stop()
+                if self._options:
+                    self._value = self._options[self._cursor]
+                self._close_dropdown()
+                self.post_message(SelectInput.ValueSelected())
+            elif event.key in ("escape", "left"):
+                event.prevent_default()
+                event.stop()
+                self._close_dropdown()
+
+    def on_blur(self) -> None:
+        if self._open:
+            self._close_dropdown()
+
+
 class BodyTextArea(DetailTextArea):
     """Body textarea: cursor line only highlighted when focused; ↑ at row 0 moves to fields."""
 
@@ -156,14 +311,23 @@ class StructuredEditor(Widget):
         for attr_key, label, _kinds, readonly in FIELD_DEFS:
             with Horizontal(classes="se-row", id=f"se-row-{attr_key}"):
                 yield Label(label, classes="se-label")
-                cls = DateFieldInput if attr_key in DATE_FIELDS else FieldInput
-                yield cls(id=f"se-inp-{attr_key}", disabled=readonly)
+                if attr_key in SELECT_FIELDS:
+                    yield SelectInput(id=f"se-inp-{attr_key}")
+                else:
+                    cls = DateFieldInput if attr_key in DATE_FIELDS else FieldInput
+                    yield cls(id=f"se-inp-{attr_key}", disabled=readonly)
         yield Rule(classes="se-sep")
         yield BodyTextArea("", id="se-body", language="markdown", theme="vscode_dark")
 
     def load(self, item: Any, kind: str) -> None:
         """Populate fields from *item* and show only the fields relevant to *kind*."""
         self._kind = kind
+
+        root = getattr(self.app, "root", None)
+        cfg = _read_config(root) if root else AppConfig({}, {}, [])
+        state: ProjectState | None = getattr(self.app, "state", None)
+        milestone_ids = [m.id for m in state.milestones] if state else []
+
         for attr_key, _label, kinds, _readonly in FIELD_DEFS:
             row = self.query_one(f"#se-row-{attr_key}")
             visible = kind in kinds
@@ -178,7 +342,24 @@ class StructuredEditor(Widget):
                     val = ""
                 else:
                     val = str(raw)
-                self.query_one(f"#se-inp-{attr_key}", Input).value = val
+
+                widget = self.query_one(f"#se-inp-{attr_key}")
+                if attr_key in SELECT_FIELDS:
+                    display: list[str] | None = None
+                    if attr_key == "status":
+                        icons = cfg.task_statuses if kind == "task" else cfg.milestone_statuses
+                        options: list[str] = list(icons.keys())
+                        display = [f"{icons[s]} {s}" for s in options]
+                    elif attr_key == "label":
+                        options = cfg.label
+                    elif attr_key == "milestone":
+                        options = [""] + milestone_ids
+                    else:  # scanned
+                        options = ["true", "false"]
+                    widget.set_options(options, display)  # type: ignore[union-attr]
+                    widget.value = val  # type: ignore[union-attr]
+                else:
+                    widget.value = val  # type: ignore[union-attr]
 
         body_attr = BODY_ATTR.get(kind, "content")
         body = getattr(item, body_attr, "") or ""
@@ -191,12 +372,12 @@ class StructuredEditor(Widget):
         for attr_key, _label, kinds, readonly in FIELD_DEFS:
             if self._kind not in kinds or readonly:
                 continue
-            inp = self.query_one(f"#se-inp-{attr_key}", Input)
-            inp.disabled = not editable
+            widget = self.query_one(f"#se-inp-{attr_key}")
+            widget.disabled = not editable
             if editable:
-                inp.remove_class("se-view-disabled")
+                widget.remove_class("se-view-disabled")
             else:
-                inp.add_class("se-view-disabled")
+                widget.add_class("se-view-disabled")
         ta = self.query_one("#se-body", BodyTextArea)
         ta.read_only = not editable
 
@@ -204,19 +385,19 @@ class StructuredEditor(Widget):
         """Focus the first editable field, falling back to the body."""
         for attr_key, _label, kinds, readonly in FIELD_DEFS:
             if self._kind in kinds and not readonly:
-                self.query_one(f"#se-inp-{attr_key}", FieldInput).focus()
+                self.query_one(f"#se-inp-{attr_key}").focus()
                 return
         self.query_one("#se-body", BodyTextArea).focus()
 
-    def _visible_inputs(self) -> list[FieldInput]:
-        """Non-readonly visible FieldInputs in display order."""
+    def _visible_inputs(self) -> list[Widget]:
+        """Non-readonly visible field widgets in display order."""
         result = []
         for attr_key, _label, kinds, readonly in FIELD_DEFS:
             if self._kind not in kinds or readonly:
                 continue
             row = self.query_one(f"#se-row-{attr_key}")
             if row.display:
-                result.append(self.query_one(f"#se-inp-{attr_key}", FieldInput))
+                result.append(self.query_one(f"#se-inp-{attr_key}"))
         return result
 
     @on(FieldInput.Navigate)
@@ -250,11 +431,10 @@ class StructuredEditor(Widget):
         for attr_key, _label, kinds, _readonly in FIELD_DEFS:
             if self._kind not in kinds:
                 continue
-            val_str = self.query_one(f"#se-inp-{attr_key}", Input).value.strip()
+            widget = self.query_one(f"#se-inp-{attr_key}")
+            val_str = widget.value.strip()  # type: ignore[union-attr]
             if attr_key == "scanned":
                 meta[attr_key] = val_str.lower() in ("true", "yes", "1")
-            elif attr_key in ("labels", "dependencies"):
-                meta[attr_key] = [v.strip() for v in val_str.split(",") if v.strip()]
             else:
                 meta[attr_key] = val_str
         body = self.query_one("#se-body", BodyTextArea).text
@@ -411,7 +591,8 @@ class NavTree(Tree):
         }
         self.clear()
 
-        ms_icons = {"active": "•", "completed": "✓", "cancelled": "✗"}
+        cfg = _read_config(root)
+
         ms = self.root.add(
             "Milestones",
             data=Nav("section", "", "milestones"),
@@ -419,20 +600,16 @@ class NavTree(Tree):
         )
         for m in state.milestones:
             ms.add_leaf(
-                truncate_label(f"{ms_icons.get(m.status, '•')} {m.title}"),
+                truncate_label(f"{cfg.milestone_statuses.get(m.status, '•')} {m.title}"),
                 data=Nav("milestone", m.id, "milestones"),
             )
 
-        task_icons = {
-            "todo": "•", "in_progress": "▶", "waiting": "…",
-            "done": "✓", "cancelled": "✗",
-        }
         tasks = self.root.add(
             "Tasks", data=Nav("section", "", "tasks"), expand="tasks" in expanded
         )
         for t in state.tasks:
             tasks.add_leaf(
-                truncate_label(f"{task_icons.get(t.status, '•')} {t.title}"),
+                truncate_label(f"{cfg.task_statuses.get(t.status, '•')} {t.title}"),
                 data=Nav("task", t.id, "tasks"),
             )
 
@@ -440,7 +617,7 @@ class NavTree(Tree):
             "Notes", data=Nav("section", "", "notes"), expand="notes" in expanded
         )
         for n in state.notes:
-            icon = "•" if not n.scanned else "·"
+            icon = "•" if n.scanned else "·"
             notes.add_leaf(truncate_label(f"{icon} {n.title}"), data=Nav("note", n.id, "notes"))
 
         if state.skills:

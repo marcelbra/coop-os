@@ -16,7 +16,7 @@ from agent_os.store import ProjectStore
 from agent_os.tui.confirm_delete import ConfirmDeleteScreen
 from agent_os.tui.nav import Nav
 from agent_os.tui.styles import CSS as APP_CSS
-from agent_os.tui.widgets import ContentPanel, DetailTextArea, FixedHeader, NavTree
+from agent_os.tui.widgets import ContentPanel, DetailTextArea, FixedHeader, NavTree, SelectInput
 
 
 class AgentOSApp(App[None]):
@@ -156,6 +156,12 @@ class AgentOSApp(App[None]):
     @on(DetailTextArea.ExitRequested)
     def on_exit_requested(self) -> None:
         self._exit_edit_mode()
+
+    @on(SelectInput.ValueSelected)
+    def on_select_value_selected(self) -> None:
+        self._save_current()
+        tree = self.query_one(NavTree)
+        tree.populate(self.state, self.root)
 
     def _exit_edit_mode(self) -> None:
         self._save_current()
