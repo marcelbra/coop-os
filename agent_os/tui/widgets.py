@@ -1,15 +1,46 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
-from textual.containers import ScrollableContainer
+import frontmatter as _fm
+from textual import on
+from textual.containers import Horizontal, ScrollableContainer
 from textual.events import Click, Key, MouseDown
 from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import Header, Markdown, TextArea, Tree
+from textual.widgets import Header, Input, Label, Markdown, Rule, TextArea, Tree
 
 from agent_os.models import ProjectState
 from agent_os.tui.nav import Nav, truncate_label
+
+# ── Structured editor field definitions ───────────────────────────────────────
+
+# (attr_key, display_label, visible_for_kinds, readonly)
+FIELD_DEFS: list[tuple[str, str, frozenset[str], bool]] = [
+    ("name",         "name",       frozenset({"role"}),                                     False),
+    ("emoji",        "emoji",      frozenset({"role"}),                                     False),
+    ("title",        "title",      frozenset({"pms", "role", "milestone", "task", "note"}), False),
+    ("date",         "date",       frozenset({"note"}),                                     False),
+    ("scanned",      "scanned",    frozenset({"note"}),                                     False),
+    ("role",         "role",       frozenset({"milestone"}),                                False),
+    ("start_date",   "start date", frozenset({"milestone"}),                                False),
+    ("end_date",     "end date",   frozenset({"milestone"}),                                False),
+    ("status",       "status",     frozenset({"milestone", "task"}),                        False),
+    ("milestone",    "milestone",  frozenset({"task"}),                                     False),
+    ("labels",       "labels",     frozenset({"task"}),                                     False),
+    ("dependencies", "depends on", frozenset({"task"}),                                     False),
+    ("created_date", "created",    frozenset({"task"}),                                     False),
+    ("id",           "id",         frozenset({"pms", "role", "milestone", "task", "note"}), True),
+]
+
+BODY_ATTR: dict[str, str] = {
+    "pms": "content",
+    "role": "content",
+    "milestone": "description",
+    "task": "description",
+    "note": "content",
+}
 
 
 class FixedHeader(Header):
@@ -32,50 +63,248 @@ class DetailTextArea(TextArea):
             self.post_message(DetailTextArea.ExitRequested())
 
 
-class ContentPanel(Widget):
-    """Right panel: Markdown viewer and TextArea editor are always mounted.
+class FieldInput(Input):
+    """Input field that navigates between fields (↑/↓) and exits edit mode (←)."""
 
-    Mode is toggled via the CSS class ``-editing`` — no widget is ever
-    unmounted, so layout is stable and there are no re-render artifacts.
+    class Navigate(Message):
+        def __init__(self, direction: int) -> None:
+            super().__init__()
+            self.direction = direction  # -1 = up, +1 = down
+
+    def on_key(self, event: Key) -> None:
+        if event.key == "up":
+            event.prevent_default()
+            event.stop()
+            self.post_message(FieldInput.Navigate(-1))
+        elif event.key == "down":
+            event.prevent_default()
+            event.stop()
+            self.post_message(FieldInput.Navigate(+1))
+        elif event.key == "left" and self.cursor_position == 0:
+            event.prevent_default()
+            event.stop()
+            self.post_message(DetailTextArea.ExitRequested())
+
+
+class BodyTextArea(DetailTextArea):
+    """Body textarea: cursor line only highlighted when focused; ↑ at row 0 moves to fields."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.highlight_cursor_line = False
+
+    def on_focus(self) -> None:
+        self.highlight_cursor_line = True
+
+    def on_blur(self) -> None:
+        self.highlight_cursor_line = False
+
+    def on_key(self, event: Key) -> None:
+        super().on_key(event)
+        if event.key == "up" and self.cursor_location[0] == 0:
+            event.prevent_default()
+            event.stop()
+            self.post_message(FieldInput.Navigate(-1))
+
+
+class StructuredEditor(Widget):
+    """Always-mounted structured editor for frontmatter documents.
+
+    Renders one Input per frontmatter field (read-only for ``id``) and a
+    DetailTextArea for the free-text body. Hidden by default; shown when
+    ContentPanel has the ``-editing-struct`` class.
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._kind: str = ""
+
+    def compose(self):
+        for attr_key, label, _kinds, readonly in FIELD_DEFS:
+            with Horizontal(classes="se-row", id=f"se-row-{attr_key}"):
+                yield Label(label, classes="se-label")
+                yield FieldInput(id=f"se-inp-{attr_key}", disabled=readonly)
+        yield Rule(classes="se-sep")
+        yield BodyTextArea("", id="se-body", language="markdown", theme="vscode_dark")
+
+    def load(self, item: Any, kind: str) -> None:
+        """Populate fields from *item* and show only the fields relevant to *kind*."""
+        self._kind = kind
+        for attr_key, _label, kinds, _readonly in FIELD_DEFS:
+            row = self.query_one(f"#se-row-{attr_key}")
+            visible = kind in kinds
+            row.display = visible
+            if visible:
+                raw = getattr(item, attr_key, None)
+                if isinstance(raw, list):
+                    val = ", ".join(str(v) for v in raw)
+                elif isinstance(raw, bool):
+                    val = "true" if raw else "false"
+                elif raw is None:
+                    val = ""
+                else:
+                    val = str(raw)
+                self.query_one(f"#se-inp-{attr_key}", Input).value = val
+
+        body_attr = BODY_ATTR.get(kind, "content")
+        body = getattr(item, body_attr, "") or ""
+        ta = self.query_one("#se-body", BodyTextArea)
+        ta.load_text(body)
+        ta.move_cursor((0, 0))
+
+    def set_editable(self, editable: bool) -> None:
+        """Toggle between view (read-only) and edit mode for non-readonly fields."""
+        for attr_key, _label, kinds, readonly in FIELD_DEFS:
+            if self._kind not in kinds or readonly:
+                continue
+            inp = self.query_one(f"#se-inp-{attr_key}", Input)
+            inp.disabled = not editable
+            if editable:
+                inp.remove_class("se-view-disabled")
+            else:
+                inp.add_class("se-view-disabled")
+        ta = self.query_one("#se-body", BodyTextArea)
+        ta.read_only = not editable
+
+    def focus_first(self) -> None:
+        """Focus the first editable field, falling back to the body."""
+        for attr_key, _label, kinds, readonly in FIELD_DEFS:
+            if self._kind in kinds and not readonly:
+                self.query_one(f"#se-inp-{attr_key}", FieldInput).focus()
+                return
+        self.query_one("#se-body", BodyTextArea).focus()
+
+    def _visible_inputs(self) -> list[FieldInput]:
+        """Non-readonly visible FieldInputs in display order."""
+        result = []
+        for attr_key, _label, kinds, readonly in FIELD_DEFS:
+            if self._kind not in kinds or readonly:
+                continue
+            row = self.query_one(f"#se-row-{attr_key}")
+            if row.display:
+                result.append(self.query_one(f"#se-inp-{attr_key}", FieldInput))
+        return result
+
+    @on(FieldInput.Navigate)
+    def _on_navigate(self, event: FieldInput.Navigate) -> None:
+        event.stop()
+        inputs = self._visible_inputs()
+        if not inputs:
+            return
+        focused = self.app.focused
+        try:
+            idx = inputs.index(focused)  # type: ignore[arg-type]
+        except ValueError:
+            # Came from BodyTextArea going up — focus last field
+            if event.direction == -1:
+                inputs[-1].focus()
+            return
+        new_idx = idx + event.direction
+        if new_idx < 0:
+            pass  # already at top field, nowhere to go
+        elif new_idx >= len(inputs):
+            self.query_one("#se-body", BodyTextArea).focus()
+        else:
+            inputs[new_idx].focus()
+
+    @property
+    def editor_text(self) -> str:
+        """Serialize current field values back to raw frontmatter format."""
+        if not self._kind:
+            return ""
+        meta: dict[str, Any] = {}
+        for attr_key, _label, kinds, _readonly in FIELD_DEFS:
+            if self._kind not in kinds:
+                continue
+            val_str = self.query_one(f"#se-inp-{attr_key}", Input).value.strip()
+            if attr_key == "scanned":
+                meta[attr_key] = val_str.lower() in ("true", "yes", "1")
+            elif attr_key in ("labels", "dependencies"):
+                meta[attr_key] = [v.strip() for v in val_str.split(",") if v.strip()]
+            else:
+                meta[attr_key] = val_str
+        body = self.query_one("#se-body", BodyTextArea).text
+        post = _fm.Post(body, **meta)
+        return _fm.dumps(post)
+
+
+class ContentPanel(Widget):
+    """Right panel: Markdown viewer, raw TextArea editor, and structured editor.
+
+    Modes are toggled via CSS classes — no widget is ever unmounted, so layout
+    is stable and there are no re-render artifacts.
+
+    CSS classes:
+      (none)             → view mode (Markdown visible)
+      -editing           → raw edit mode (agent / skill files)
+      -editing-struct    → structured edit mode (pms / role / milestone / task / note)
     """
 
     def compose(self):
         with ScrollableContainer(classes="cp-viewer"):
             yield Markdown("")
-        yield DetailTextArea("", language="markdown", theme="vscode_dark")
+        yield DetailTextArea(
+            "", language="markdown", theme="vscode_dark", classes="cp-raw-editor"
+        )
+        yield StructuredEditor()
 
     # ── Public interface ───────────────────────────────────────────────────
 
     def show_view(self, md: str):
-        """Switch to view mode and update Markdown content.
-
-        Returns an ``AwaitComplete`` that can be awaited by the caller.
-        """
+        """Switch to view mode and update Markdown content."""
         self.remove_class("-editing")
+        self.remove_class("-editing-struct")
+        self.remove_class("-view-struct")
         return self.query_one(Markdown).update(md)
 
     def enter_edit(self, text: str) -> None:
-        """Switch to edit mode, load *text* into the editor, and focus it."""
-        ta = self.query_one(DetailTextArea)
+        """Raw edit mode for agent/skill (plain markdown files)."""
+        ta = self.query_one(".cp-raw-editor", DetailTextArea)
         ta.load_text(text)
         ta.move_cursor((0, 0))
+        self.remove_class("-editing-struct")
         self.add_class("-editing")
         ta.focus()
+
+    def show_struct_view(self, item: Any, kind: str) -> None:
+        """Structured view mode (read-only) for pms / role / milestone / task / note."""
+        se = self.query_one(StructuredEditor)
+        se.load(item, kind)
+        se.set_editable(False)
+        self.remove_class("-editing")
+        self.remove_class("-editing-struct")
+        self.add_class("-view-struct")
+
+    def enter_structured_edit(self, item: Any, kind: str) -> None:
+        """Structured edit mode for pms / role / milestone / task / note."""
+        se = self.query_one(StructuredEditor)
+        se.load(item, kind)
+        se.set_editable(True)
+        self.remove_class("-editing")
+        self.remove_class("-view-struct")
+        self.add_class("-editing-struct")
+        se.focus_first()
 
     def clear(self) -> None:
         """Switch to view mode and clear the Markdown content."""
         self.remove_class("-editing")
-        self.query_one(Markdown).update("")  # fire-and-forget
+        self.remove_class("-editing-struct")
+        self.remove_class("-view-struct")
+        self.query_one(Markdown).update("")
 
     # ── Properties ────────────────────────────────────────────────────────
 
     @property
     def is_editing(self) -> bool:
-        return self.has_class("-editing")
+        return self.has_class("-editing") or self.has_class("-editing-struct")
 
     @property
     def editor_text(self) -> str:
-        return self.query_one(DetailTextArea).text
+        if self.has_class("-editing"):
+            return self.query_one(".cp-raw-editor", DetailTextArea).text
+        if self.has_class("-editing-struct"):
+            return self.query_one(StructuredEditor).editor_text
+        return ""
 
 
 class NavTree(Tree):

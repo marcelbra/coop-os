@@ -11,11 +11,10 @@ from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import Footer, Tree
 
-from agent_os import parser
 from agent_os.models import PMS, Milestone, Note, ProjectState, Role, Task
+from agent_os.store import ProjectStore
 from agent_os.tui.confirm_delete import ConfirmDeleteScreen
 from agent_os.tui.nav import Nav
-from agent_os.tui.render import to_md
 from agent_os.tui.styles import CSS as APP_CSS
 from agent_os.tui.widgets import ContentPanel, DetailTextArea, FixedHeader, NavTree
 
@@ -34,6 +33,7 @@ class AgentOSApp(App[None]):
     def __init__(self, root: Path) -> None:
         super().__init__()
         self.root = root
+        self.store = ProjectStore(root)
         self.state: ProjectState | None = None
         self.selected: Nav | None = None
         for d in ("context/roles", "milestones", "tasks", "notes"):
@@ -54,7 +54,7 @@ class AgentOSApp(App[None]):
     # ── State ─────────────────────────────────────────────────────────────────
 
     def _reload(self) -> None:
-        self.state = parser.read_project(self.root)
+        self.state = self.store.load()
         tree = self.query_one(NavTree)
         tree.populate(self.state, self.root)
         if self.selected:
@@ -92,7 +92,7 @@ class AgentOSApp(App[None]):
             return self.root / "AGENT.md"
         if self.selected.kind == "skill":
             return self.root / "skills" / f"{self.selected.id}.md"
-        return parser.find_item_path(self.root, self.selected.kind, self.selected.id)
+        return self.store.find_item_path(self.selected.kind, self.selected.id)
 
     def _update_footer_hints(self, nav: Nav | None) -> None:
         content = self.query_one(ContentPanel)
@@ -163,7 +163,10 @@ class AgentOSApp(App[None]):
 
     def _exit_edit_mode(self) -> None:
         self._save_current()
-        self.query_one(ContentPanel).remove_class("-editing")
+        content = self.query_one(ContentPanel)
+        content.remove_class("-editing")
+        content.remove_class("-editing-struct")
+        content.remove_class("-view-struct")
         self._show_view()
         self._update_footer_hints(self.selected)
         self.call_after_refresh(self.query_one(NavTree).focus)
@@ -180,20 +183,27 @@ class AgentOSApp(App[None]):
         if self.selected.kind in ("agent", "skill"):
             path = self._item_path()
             md = path.read_text(encoding="utf-8") if path and path.exists() else ""
+            await content.show_view(md)
         else:
             item = self._item()
             if not item:
                 return
-            md = to_md(item, self.selected.kind)
-        await content.show_view(md)
+            content.show_struct_view(item, self.selected.kind)
 
     def _show_edit(self) -> None:
-        path = self._item_path()
-        if not path or not path.exists():
+        content = self.query_one(ContentPanel)
+        if not self.selected:
             return
-        self.query_one(ContentPanel).enter_edit(
-            path.read_text(encoding="utf-8")
-        )
+        if self.selected.kind in ("agent", "skill"):
+            path = self._item_path()
+            if not path or not path.exists():
+                return
+            content.enter_edit(path.read_text(encoding="utf-8"))
+        else:
+            item = self._item()
+            if not item:
+                return
+            content.enter_structured_edit(item, self.selected.kind)
 
     # ── Auto-save ─────────────────────────────────────────────────────────────
 
@@ -206,7 +216,7 @@ class AgentOSApp(App[None]):
             return
         try:
             path.write_text(content.editor_text, encoding="utf-8")
-            self.state = parser.read_project(self.root)
+            self.state = self.store.load()
         except Exception as e:
             self.notify(str(e), severity="error", timeout=4)
 
@@ -233,40 +243,40 @@ class AgentOSApp(App[None]):
         match section:
             case "context":
                 new_item = Role(
-                    id=parser.next_role_id(self.root),
+                    id=self.store.roles.next_id(),
                     name="New Role",
                     emoji="⭐",
                     title="",
                 )
-                parser.write_role(self.root, new_item)
+                self.store.roles.save(new_item)
                 kind = "role"
             case "milestones":
                 first_role = self.state.roles[0].id if self.state.roles else ""
                 new_item = Milestone(
-                    id=parser.next_milestone_id(self.root),
+                    id=self.store.milestones.next_id(),
                     title="New Milestone",
                     role=first_role,
                     start_date=today,
                     end_date="",
                 )
-                parser.write_milestone(self.root, new_item)
+                self.store.milestones.save(new_item)
                 kind = "milestone"
             case "tasks":
                 new_item = Task(
-                    id=parser.next_task_id(self.root),
+                    id=self.store.tasks.next_id(),
                     title="New Task",
                     created_date=today,
                 )
-                parser.write_task(self.root, new_item)
+                self.store.tasks.save(new_item)
                 kind = "task"
             case _:
                 new_item = Note(
-                    id=parser.next_note_id(self.root), title="New Note", date=today
+                    id=self.store.notes.next_id(), title="New Note", date=today
                 )
-                parser.write_note(self.root, new_item)
+                self.store.notes.save(new_item)
                 kind = "note"
 
-        self.state = parser.read_project(self.root)
+        self.state = self.store.load()
         tree = self.query_one(NavTree)
         tree.populate(self.state, self.root)
         self.selected = Nav(kind, new_item.id, section)
@@ -315,13 +325,13 @@ class AgentOSApp(App[None]):
         deleted = False
         match nav.kind:
             case "role":
-                deleted = parser.delete_role(self.root, nav.id)
+                deleted = self.store.roles.delete(nav.id)
             case "milestone":
-                deleted = parser.delete_milestone(self.root, nav.id)
+                deleted = self.store.milestones.delete(nav.id)
             case "task":
-                deleted = parser.delete_task(self.root, nav.id)
+                deleted = self.store.tasks.delete(nav.id)
             case "note":
-                deleted = parser.delete_note(self.root, nav.id)
+                deleted = self.store.notes.delete(nav.id)
         if deleted:
             self.selected = next_nav if next_nav and next_nav.kind != "section" else None
             self._reload()
