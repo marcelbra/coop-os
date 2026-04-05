@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.scripts]
-agent-os = "agent_os.__main__:main"
+agent-os = "agent_os.main:main"
 
 [build-system]
 requires = ["hatchling"]
