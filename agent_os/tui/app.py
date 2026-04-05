@@ -37,7 +37,7 @@ class AgentOSApp(App[None]):
         self.state: ProjectState | None = None
         self.selected: Nav | None = None
         for d in ("milestones", "tasks", "notes"):
-            (root / d).mkdir(parents=True, exist_ok=True)
+            (root / "content" / d).mkdir(parents=True, exist_ok=True)
 
     # ── Layout ────────────────────────────────────────────────────────────────
 
@@ -85,9 +85,9 @@ class AgentOSApp(App[None]):
         if not self.selected:
             return None
         if self.selected.kind == "agent":
-            return self.root / "AGENT.md"
+            return self.root / "content" / "AGENT.md"
         if self.selected.kind == "skill":
-            return self.root / "skills" / f"{self.selected.id}.md"
+            return self.root / "content" / "skills" / f"{self.selected.id}.md"
         return self.store.find_item_path(self.selected.kind, self.selected.id)
 
     def _update_footer_hints(self, nav: Nav | None) -> None:
