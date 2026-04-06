@@ -48,8 +48,9 @@ class CalendarWidget(Widget):
         # ("header", col) where col: 0=<  1=month  2=year  3=>
         # ("day", row, col) where row/col index the day grid
         self._focus: tuple[Any, ...] = ("header", 0)
-        if initial and initial.year == self._year and initial.month == self._month:
-            self._init_focus(initial)
+        focus_date = initial if initial is not None else _date.today()
+        if focus_date.year == self._year and focus_date.month == self._month:
+            self._init_focus(focus_date)
 
     # ── Helpers ────────────────────────────────────────────────────────────
 
