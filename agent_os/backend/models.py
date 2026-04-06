@@ -5,6 +5,11 @@ from enum import StrEnum
 from pydantic import BaseModel
 
 
+class RoleStatus(StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
 class TaskStatus(StrEnum):
     TODO = "todo"
     IN_PROGRESS = "in_progress"
@@ -19,12 +24,20 @@ class MilestoneStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class Role(BaseModel):
+    id: str
+    title: str
+    status: RoleStatus = RoleStatus.ACTIVE
+    description: str = ""
+
+
 class Milestone(BaseModel):
     id: str
     title: str
     start_date: str = ""
     end_date: str = ""
     status: MilestoneStatus = MilestoneStatus.ACTIVE
+    role: str | None = None
     description: str = ""
 
 
@@ -59,6 +72,7 @@ class ParseError(BaseModel):
 
 
 class ProjectState(BaseModel):
+    roles: list[Role] = []
     milestones: list[Milestone] = []
     tasks: list[Task] = []
     notes: list[Note] = []

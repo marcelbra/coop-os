@@ -83,6 +83,17 @@ class NavTree(Tree[Nav | None]):
 
         cfg = read_config(root)
 
+        roles = self.root.add(
+            "Roles",
+            data=Nav("section", "", "roles"),
+            expand="roles" in expanded,
+        )
+        for r in state.roles:
+            roles.add_leaf(
+                truncate_label(f"{cfg.role_statuses.get(r.status, '•')} {r.title}"),
+                data=Nav("role", r.id, "roles"),
+            )
+
         ms = self.root.add(
             "Milestones",
             data=Nav("section", "", "milestones"),

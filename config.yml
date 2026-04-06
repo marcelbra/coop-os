@@ -10,3 +10,6 @@ milestone_statuses:
   completed: "✓"
   cancelled: "✗"
 
+role_statuses:
+  active: "◆"
+  inactive: "◇"

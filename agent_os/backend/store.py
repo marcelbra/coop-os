@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import re
 import shutil
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import frontmatter
 
@@ -12,6 +13,7 @@ from agent_os.backend.models import (
     Note,
     ParseError,
     ProjectState,
+    Role,
     Skill,
     Task,
 )
@@ -73,58 +75,120 @@ def _find_task_dir(tasks_dir: Path, task_id: str) -> Path | None:
     return next((d for d in tasks_dir.iterdir() if _match(d)), None)
 
 
-# ── Entity stores ─────────────────────────────────────────────────────────────
+# ── Base store for flat-file entities ─────────────────────────────────────────
 
 
-class MilestoneStore:
-    def __init__(self, root: Path) -> None:
-        self.root = root
-        self._dir = root / "agent_os" / "context" / "milestones"
+class _HasId(Protocol):
+    id: str
 
-    def load_all(self) -> tuple[list[Milestone], list[ParseError]]:
-        milestones: list[Milestone] = []
+
+class FlatFileStore[T: _HasId](ABC):
+    """Base class for stores that persist each item as a single .md file."""
+
+    def __init__(self, root: Path, rel_dir: str, prefix: str, label: str | None = None) -> None:
+        self._dir = root / "agent_os" / rel_dir
+        self._prefix = prefix
+        self._label = label or (prefix + "s")
+
+    @abstractmethod
+    def _parse(self, meta: dict[str, Any], content: str) -> T: ...
+
+    @abstractmethod
+    def _to_meta_content(self, item: T) -> tuple[dict[str, Any], str]: ...
+
+    @abstractmethod
+    def _file_slug(self, item: T) -> str: ...
+
+    def load_all(self) -> tuple[list[T], list[ParseError]]:
+        items: list[T] = []
         errors: list[ParseError] = []
         if not self._dir.exists():
-            return milestones, errors
+            return items, errors
         for path in sorted(self._dir.glob("*.md")):
             try:
                 meta, content = _read_fm(path)
-                milestones.append(Milestone(
-                    id=str(meta["id"]),
-                    title=str(meta["title"]),
-                    start_date=str(meta.get("start_date", "")),
-                    end_date=str(meta.get("end_date", "")),
-                    status=meta.get("status", "active"),
-                    description=content,
-                ))
+                items.append(self._parse(meta, content))
             except Exception as e:
-                errors.append(ParseError(file=f"milestones/{path.name}", error=str(e)))
-        return milestones, errors
+                errors.append(ParseError(file=f"{self._label}/{path.name}", error=str(e)))
+        return items, errors
 
     def next_id(self) -> str:
-        return _next_id([_fm_id(p) for p in self._dir.glob("*.md")] if self._dir.exists() else [], "milestone")
+        ids = [_fm_id(p) for p in self._dir.glob("*.md")] if self._dir.exists() else []
+        return _next_id(ids, self._prefix)
 
-    def save(self, ms: Milestone) -> None:
+    def save(self, item: T) -> None:
         self._dir.mkdir(parents=True, exist_ok=True)
-        existing = _find_file_by_id(self._dir, ms.id)
-        path = existing or self._dir / f"{ms.id}-{_slugify(ms.title)}.md"
-        _write_fm(path, {
-            "id": ms.id,
-            "title": ms.title,
-            "start_date": ms.start_date,
-            "end_date": ms.end_date,
-            "status": str(ms.status),
-        }, ms.description)
+        existing = _find_file_by_id(self._dir, item.id)
+        path = existing or self._dir / f"{item.id}-{_slugify(self._file_slug(item))}.md"
+        meta, content = self._to_meta_content(item)
+        _write_fm(path, meta, content)
 
-    def delete(self, ms_id: str) -> bool:
-        path = _find_file_by_id(self._dir, ms_id)
+    def delete(self, item_id: str) -> bool:
+        path = _find_file_by_id(self._dir, item_id)
         if path:
             path.unlink()
             return True
         return False
 
-    def find_path(self, ms_id: str) -> Path | None:
-        return _find_file_by_id(self._dir, ms_id)
+    def find_path(self, item_id: str) -> Path | None:
+        return _find_file_by_id(self._dir, item_id)
+
+
+# ── Entity stores ─────────────────────────────────────────────────────────────
+
+
+class RoleStore(FlatFileStore[Role]):
+    def __init__(self, root: Path) -> None:
+        super().__init__(root, "context/roles", "role")
+
+    def _parse(self, meta: dict[str, Any], content: str) -> Role:
+        return Role(
+            id=str(meta["id"]),
+            title=str(meta["title"]),
+            status=meta.get("status", "active"),
+            description=content,
+        )
+
+    def _to_meta_content(self, item: Role) -> tuple[dict[str, Any], str]:
+        return {
+            "id": item.id,
+            "title": item.title,
+            "status": str(item.status),
+        }, item.description
+
+    def _file_slug(self, item: Role) -> str:
+        return item.title
+
+
+class MilestoneStore(FlatFileStore[Milestone]):
+    def __init__(self, root: Path) -> None:
+        super().__init__(root, "context/milestones", "milestone")
+
+    def _parse(self, meta: dict[str, Any], content: str) -> Milestone:
+        return Milestone(
+            id=str(meta["id"]),
+            title=str(meta["title"]),
+            start_date=str(meta.get("start_date", "")),
+            end_date=str(meta.get("end_date", "")),
+            status=meta.get("status", "active"),
+            role=str(meta["role"]) if meta.get("role") else None,
+            description=content,
+        )
+
+    def _to_meta_content(self, item: Milestone) -> tuple[dict[str, Any], str]:
+        meta: dict[str, Any] = {
+            "id": item.id,
+            "title": item.title,
+            "start_date": item.start_date,
+            "end_date": item.end_date,
+            "status": str(item.status),
+        }
+        if item.role:
+            meta["role"] = item.role
+        return meta, item.description
+
+    def _file_slug(self, item: Milestone) -> str:
+        return item.title
 
 
 class TaskStore:
@@ -163,7 +227,7 @@ class TaskStore:
             _fm_id(td / "description.md")
             for td in self._dir.iterdir()
             if td.is_dir() and (td / "description.md").exists()
-        ]
+        ] if self._dir.exists() else []
         return _next_id(ids, "task")
 
     def save(self, task: Task) -> None:
@@ -194,90 +258,47 @@ class TaskStore:
         return d / "description.md" if d else None
 
 
-class NoteStore:
+class NoteStore(FlatFileStore[Note]):
     def __init__(self, root: Path) -> None:
-        self.root = root
-        self._dir = root / "agent_os" / "context" / "notes"
+        super().__init__(root, "context/notes", "note")
 
-    def load_all(self) -> tuple[list[Note], list[ParseError]]:
-        notes: list[Note] = []
-        errors: list[ParseError] = []
-        if not self._dir.exists():
-            return notes, errors
-        for path in sorted(self._dir.glob("*.md")):
-            try:
-                meta, content = _read_fm(path)
-                notes.append(Note(
-                    id=str(meta["id"]),
-                    title=str(meta["title"]),
-                    date=str(meta.get("date", "")),
-                    scanned=bool(meta.get("scanned", False)),
-                    content=content,
-                ))
-            except Exception as e:
-                errors.append(ParseError(file=f"notes/{path.name}", error=str(e)))
-        return notes, errors
+    def _parse(self, meta: dict[str, Any], content: str) -> Note:
+        return Note(
+            id=str(meta["id"]),
+            title=str(meta["title"]),
+            date=str(meta.get("date", "")),
+            scanned=bool(meta.get("scanned", False)),
+            content=content,
+        )
 
-    def next_id(self) -> str:
-        return _next_id([_fm_id(p) for p in self._dir.glob("*.md")] if self._dir.exists() else [], "note")
+    def _to_meta_content(self, item: Note) -> tuple[dict[str, Any], str]:
+        return {
+            "id": item.id,
+            "title": item.title,
+            "date": item.date,
+            "scanned": item.scanned,
+        }, item.content
 
-    def save(self, note: Note) -> None:
-        self._dir.mkdir(parents=True, exist_ok=True)
-        existing = _find_file_by_id(self._dir, note.id)
-        path = existing or self._dir / f"{note.id}-{_slugify(note.title)}.md"
-        _write_fm(path, {"id": note.id, "title": note.title, "date": note.date, "scanned": note.scanned}, note.content)
-
-    def delete(self, note_id: str) -> bool:
-        path = _find_file_by_id(self._dir, note_id)
-        if path:
-            path.unlink()
-            return True
-        return False
-
-    def find_path(self, note_id: str) -> Path | None:
-        return _find_file_by_id(self._dir, note_id)
+    def _file_slug(self, item: Note) -> str:
+        return item.title
 
 
-class SkillStore:
+class SkillStore(FlatFileStore[Skill]):
     def __init__(self, root: Path) -> None:
-        self.root = root
-        self._dir = root / "agent_os" / "skills"
+        super().__init__(root, "skills", "skill", label="agent_os/skills")
 
-    def load_all(self) -> tuple[list[Skill], list[ParseError]]:
-        skills: list[Skill] = []
-        errors: list[ParseError] = []
-        if not self._dir.exists():
-            return skills, errors
-        for path in sorted(self._dir.glob("*.md")):
-            try:
-                meta, content = _read_fm(path)
-                skills.append(Skill(
-                    id=str(meta["id"]),
-                    command=str(meta["command"]),
-                    content=content,
-                ))
-            except Exception as e:
-                errors.append(ParseError(file=f"agent_os/skills/{path.name}", error=str(e)))
-        return skills, errors
+    def _parse(self, meta: dict[str, Any], content: str) -> Skill:
+        return Skill(
+            id=str(meta["id"]),
+            command=str(meta["command"]),
+            content=content,
+        )
 
-    def next_id(self) -> str:
-        return _next_id([_fm_id(p) for p in self._dir.glob("*.md")] if self._dir.exists() else [], "skill")
+    def _to_meta_content(self, item: Skill) -> tuple[dict[str, Any], str]:
+        return {"id": item.id, "command": item.command}, item.content
 
-    def save(self, skill: Skill) -> None:
-        self._dir.mkdir(parents=True, exist_ok=True)
-        existing = _find_file_by_id(self._dir, skill.id)
-        path = existing or self._dir / f"{skill.id}-{_slugify(skill.command)}.md"
-        _write_fm(path, {"id": skill.id, "command": skill.command}, skill.content)
-
-    def delete(self, skill_id: str) -> bool:
-        path = _find_file_by_id(self._dir, skill_id)
-        if path:
-            path.unlink()
-            return True
-        return False
-
-    def find_path(self, skill_id: str) -> Path | None:
-        return _find_file_by_id(self._dir, skill_id)
+    def _file_slug(self, item: Skill) -> str:
+        return item.command
 
 
 # ── Project store ─────────────────────────────────────────────────────────────
@@ -286,21 +307,32 @@ class SkillStore:
 class ProjectStore:
     def __init__(self, root: Path) -> None:
         self.root = root
+        self.roles = RoleStore(root)
         self.milestones = MilestoneStore(root)
         self.tasks = TaskStore(root)
         self.notes = NoteStore(root)
         self.skills = SkillStore(root)
 
     def load(self) -> ProjectState:
+        roles, role_errs = self.roles.load_all()
         milestones, ms_errs = self.milestones.load_all()
         tasks, task_errs = self.tasks.load_all()
         notes, note_errs = self.notes.load_all()
         skills, skill_errs = self.skills.load_all()
-        errors = ms_errs + task_errs + note_errs + skill_errs
-        return ProjectState(milestones=milestones, tasks=tasks, notes=notes, skills=skills, errors=errors)
+        errors = role_errs + ms_errs + task_errs + note_errs + skill_errs
+        return ProjectState(
+            roles=roles,
+            milestones=milestones,
+            tasks=tasks,
+            notes=notes,
+            skills=skills,
+            errors=errors,
+        )
 
     def find_item_path(self, kind: str, item_id: str) -> Path | None:
         match kind:
+            case "role":
+                return self.roles.find_path(item_id)
             case "milestone":
                 return self.milestones.find_path(item_id)
             case "task":

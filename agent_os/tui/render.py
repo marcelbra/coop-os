@@ -2,12 +2,21 @@ from __future__ import annotations
 
 from typing import cast
 
-from agent_os.backend.models import Milestone, Note, Task
+from agent_os.backend.models import Milestone, Note, Role, Task
 from agent_os.tui.widgets.config import SCANNED_ICONS
 
 
-def to_md(item: Milestone | Task | Note, kind: str) -> str:
+def to_md(item: Role | Milestone | Task | Note, kind: str) -> str:
     match kind:
+        case "role":
+            role = cast(Role, item)
+            return (
+                f"# {role.title}\n\n"
+                f"| | |\n|:--|:--|\n"
+                f"| id | `{role.id}` |\n"
+                f"| status | **{role.status}** |\n\n"
+                f"---\n\n{role.description}"
+            )
         case "milestone":
             ms = cast(Milestone, item)
             return (
@@ -16,7 +25,8 @@ def to_md(item: Milestone | Task | Note, kind: str) -> str:
                 f"| id | `{ms.id}` |\n"
                 f"| start | {ms.start_date} |\n"
                 f"| end | {ms.end_date} |\n"
-                f"| status | **{ms.status}** |\n\n"
+                f"| status | **{ms.status}** |\n"
+                f"| role | {ms.role or '—'} |\n\n"
                 f"---\n\n{ms.description}"
             )
         case "task":

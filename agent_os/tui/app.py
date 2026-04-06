@@ -11,7 +11,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import Footer, Tree
 
-from agent_os.backend.models import Milestone, Note, ProjectState, Skill, Task
+from agent_os.backend.models import Milestone, Note, ProjectState, Role, Skill, Task
 from agent_os.backend.store import ProjectStore
 from agent_os.tui.confirm_delete import ConfirmDeleteScreen
 from agent_os.tui.nav import Nav
@@ -65,12 +65,14 @@ class AgentOSApp(App[None]):
                 timeout=4,
             )
 
-    def _item(self) -> Milestone | Task | Note | Skill | None:
+    def _item(self) -> Role | Milestone | Task | Note | Skill | None:
         n = self.selected
         if not n or not self.state:
             return None
         s = self.state
         match n.kind:
+            case "role":
+                return next((r for r in s.roles if r.id == n.id), None)
             case "milestone":
                 return next((m for m in s.milestones if m.id == n.id), None)
             case "task":
@@ -96,14 +98,14 @@ class AgentOSApp(App[None]):
             and nav is not None
             and (
                 nav.kind == "section"
-                and nav.section in ("milestones", "tasks", "notes", "skills")
-                or nav.kind in ("milestone", "task", "note", "skill")
+                and nav.section in ("roles", "milestones", "tasks", "notes", "skills")
+                or nav.kind in ("role", "milestone", "task", "note", "skill")
             )
         )
         show_delete = (
             not content.is_editing
             and nav is not None
-            and nav.kind in ("milestone", "task", "note", "skill")
+            and nav.kind in ("role", "milestone", "task", "note", "skill")
         )
         for key, action, show in (
             ("n", "new_item", show_new),
@@ -252,10 +254,17 @@ class AgentOSApp(App[None]):
             section = nav.section if nav and nav.kind == "section" else "notes"
 
         today = date.today().isoformat()
-        new_item: Milestone | Task | Note | Skill
+        new_item: Role | Milestone | Task | Note | Skill
         kind: str
 
         match section:
+            case "roles":
+                new_item = Role(
+                    id=self.store.roles.next_id(),
+                    title="New Role",
+                )
+                self.store.roles.save(new_item)
+                kind = "role"
             case "milestones":
                 new_item = Milestone(
                     id=self.store.milestones.next_id(),
@@ -312,7 +321,7 @@ class AgentOSApp(App[None]):
             for section in tree.root.children
             for leaf in section.children
             if isinstance(leaf.data, Nav)
-            and leaf.data.kind in ("milestone", "task", "note")
+            and leaf.data.kind in ("role", "milestone", "task", "note", "skill")
             and leaf.data.section == nav.section
         ]
         idx = next((i for i, n in enumerate(section_leaves) if n.id == nav.id), None)
@@ -335,6 +344,8 @@ class AgentOSApp(App[None]):
             return
         deleted = False
         match nav.kind:
+            case "role":
+                deleted = self.store.roles.delete(nav.id)
             case "milestone":
                 deleted = self.store.milestones.delete(nav.id)
             case "task":

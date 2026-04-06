@@ -61,8 +61,9 @@ class StructuredEditor(Widget):
         self._kind = kind
 
         root = getattr(self.app, "root", None)
-        cfg = read_config(root) if root else AppConfig({}, {})
+        cfg = read_config(root) if root else AppConfig({}, {}, {})
         state: ProjectState | None = getattr(self.app, "state", None)
+        role_ids = [r.id for r in state.roles] if state else []
         milestone_ids = [m.id for m in state.milestones] if state else []
 
         for attr_key, _label, kinds, _readonly in FIELD_DEFS:
@@ -84,9 +85,16 @@ class StructuredEditor(Widget):
                 if attr_key in SELECT_FIELDS:
                     display: list[str] | None = None
                     if attr_key == "status":
-                        icons = cfg.task_statuses if kind == "task" else cfg.milestone_statuses
+                        if kind == "task":
+                            icons = cfg.task_statuses
+                        elif kind == "role":
+                            icons = cfg.role_statuses
+                        else:
+                            icons = cfg.milestone_statuses
                         options: list[str] = list(icons.keys())
                         display = [f"{icons[s]} {s}" for s in options]
+                    elif attr_key == "role":
+                        options = [""] + role_ids
                     elif attr_key == "milestone":
                         options = [""] + milestone_ids
                     else:  # scanned
