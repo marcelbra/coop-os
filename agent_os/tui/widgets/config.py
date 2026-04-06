@@ -15,6 +15,7 @@ FIELD_DEFS: list[tuple[str, str, frozenset[str], bool]] = [
     ("status",     "status",     frozenset({"role", "milestone", "task"}),                         False),
     ("role",       "role",       frozenset({"milestone"}),                                         False),
     ("milestone",  "milestone",  frozenset({"task"}),                                              False),
+    ("parent",     "parent",     frozenset({"task"}),                                              True),
     ("id",         "id",         frozenset({"role", "milestone", "task", "note", "skill"}),       True),
 ]
 
