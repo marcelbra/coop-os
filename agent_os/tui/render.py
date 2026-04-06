@@ -31,16 +31,15 @@ def to_md(item: Role | Milestone | Task | Note, kind: str) -> str:
             )
         case "task":
             task = cast(Task, item)
-            deps = ", ".join(task.dependencies) if task.dependencies else "—"
             return (
                 f"# {task.title}\n\n"
                 f"| | |\n|:--|:--|\n"
                 f"| id | `{task.id}` |\n"
+                f"| parent | {task.parent or '—'} |\n"
                 f"| start | {task.start_date or '—'} |\n"
                 f"| end | {task.end_date or '—'} |\n"
                 f"| status | **{task.status}** |\n"
-                f"| milestone | {task.milestone or '—'} |\n"
-                f"| depends | {deps} |\n\n"
+                f"| milestone | {task.milestone or '—'} |\n\n"
                 f"---\n\n{task.description}"
             )
         case "note":

@@ -65,14 +65,42 @@ def _find_file_by_id(directory: Path, item_id: str) -> Path | None:
     return next((p for p in directory.glob("*.md") if _fm_id(p) == item_id), None)
 
 
-def _find_task_dir(tasks_dir: Path, task_id: str) -> Path | None:
-    if not tasks_dir.exists():
+_TASK_DIR_RE = re.compile(r"^task-\d+-")
+
+
+def _is_task_dir(d: Path) -> bool:
+    return d.is_dir() and bool(_TASK_DIR_RE.match(d.name))
+
+
+def _find_task_dir(search_dir: Path, task_id: str) -> Path | None:
+    """Recursively find a task directory by ID under *search_dir*."""
+    if not search_dir.exists():
         return None
+    for d in search_dir.iterdir():
+        if not _is_task_dir(d):
+            continue
+        desc = d / "description.md"
+        if desc.exists() and _fm_id(desc) == task_id:
+            return d
+        found = _find_task_dir(d, task_id)
+        if found:
+            return found
+    return None
 
-    def _match(d: Path) -> bool:
-        return d.is_dir() and (d / "description.md").exists() and _fm_id(d / "description.md") == task_id
 
-    return next((d for d in tasks_dir.iterdir() if _match(d)), None)
+def _collect_task_ids(search_dir: Path) -> list[str]:
+    """Recursively collect all task IDs under *search_dir*."""
+    ids: list[str] = []
+    if not search_dir.exists():
+        return ids
+    for d in search_dir.iterdir():
+        if not _is_task_dir(d):
+            continue
+        desc = d / "description.md"
+        if desc.exists():
+            ids.append(_fm_id(desc))
+        ids.extend(_collect_task_ids(d))
+    return ids
 
 
 # ── Base store for flat-file entities ─────────────────────────────────────────
@@ -196,18 +224,20 @@ class TaskStore:
         self.root = root
         self._dir = root / "agent_os" / "context" / "tasks"
 
-    def load_all(self) -> tuple[list[Task], list[ParseError]]:
-        tasks: list[Task] = []
-        errors: list[ParseError] = []
-        if not self._dir.exists():
-            return tasks, errors
-        for task_dir in sorted(d for d in self._dir.iterdir() if d.is_dir()):
+    def _load_from_dir(
+        self, search_dir: Path, parent_id: str | None, tasks: list[Task], errors: list[ParseError]
+    ) -> None:
+        for task_dir in sorted(d for d in search_dir.iterdir() if _is_task_dir(d)):
             desc_path = task_dir / "description.md"
             if not desc_path.exists():
-                errors.append(ParseError(file=f"tasks/{task_dir.name}", error="Missing description.md"))
+                errors.append(ParseError(file=f"tasks/.../{task_dir.name}", error="Missing description.md"))
                 continue
             try:
                 meta, content = _read_fm(desc_path)
+                # parent is derived from directory nesting, not from the frontmatter
+                # field. The frontmatter `parent:` is written for human readability /
+                # agent access but is intentionally ignored here — directory location
+                # is authoritative.
                 tasks.append(Task(
                     id=str(meta["id"]),
                     title=str(meta["title"]),
@@ -215,24 +245,34 @@ class TaskStore:
                     end_date=str(meta.get("end_date", "")),
                     status=meta.get("status", "todo"),
                     milestone=str(meta["milestone"]) if meta.get("milestone") else None,
-                    dependencies=[str(d) for d in meta.get("dependencies", [])],
+                    parent=parent_id,
                     description=content,
                 ))
+                self._load_from_dir(task_dir, str(meta["id"]), tasks, errors)
             except Exception as e:
-                errors.append(ParseError(file=f"tasks/{task_dir.name}/description.md", error=str(e)))
+                errors.append(ParseError(file=f"tasks/.../{task_dir.name}/description.md", error=str(e)))
+
+    def load_all(self) -> tuple[list[Task], list[ParseError]]:
+        tasks: list[Task] = []
+        errors: list[ParseError] = []
+        if not self._dir.exists():
+            return tasks, errors
+        self._load_from_dir(self._dir, None, tasks, errors)
         return tasks, errors
 
     def next_id(self) -> str:
-        ids = [
-            _fm_id(td / "description.md")
-            for td in self._dir.iterdir()
-            if td.is_dir() and (td / "description.md").exists()
-        ] if self._dir.exists() else []
-        return _next_id(ids, "task")
+        return _next_id(_collect_task_ids(self._dir), "task")
 
     def save(self, task: Task) -> None:
         existing_dir = _find_task_dir(self._dir, task.id)
-        task_dir = existing_dir or self._dir / f"{task.id}-{_slugify(task.title)}"
+        if existing_dir:
+            task_dir = existing_dir
+        elif task.parent:
+            parent_dir = _find_task_dir(self._dir, task.parent)
+            base = parent_dir if parent_dir else self._dir
+            task_dir = base / f"{task.id}-{_slugify(task.title)}"
+        else:
+            task_dir = self._dir / f"{task.id}-{_slugify(task.title)}"
         task_dir.mkdir(parents=True, exist_ok=True)
         meta: dict[str, Any] = {
             "id": task.id,
@@ -240,10 +280,11 @@ class TaskStore:
             "start_date": task.start_date,
             "end_date": task.end_date,
             "status": str(task.status),
-            "dependencies": task.dependencies,
         }
         if task.milestone:
             meta["milestone"] = task.milestone
+        if task.parent:
+            meta["parent"] = task.parent
         _write_fm(task_dir / "description.md", meta, task.description)
 
     def delete(self, task_id: str) -> bool:

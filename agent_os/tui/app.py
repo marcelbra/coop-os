@@ -18,6 +18,14 @@ from agent_os.tui.nav import Nav
 from agent_os.tui.styles import CSS as APP_CSS
 from agent_os.tui.widgets import ContentPanel, DetailTextArea, FixedHeader, NavTree, SelectInput, StructuredEditor
 
+_SECTION_TO_KIND: dict[str, str] = {
+    "roles": "role",
+    "milestones": "milestone",
+    "tasks": "task",
+    "notes": "note",
+    "skills": "skill",
+}
+
 
 class AgentOSApp(App[None]):
     TITLE = "agent-os"
@@ -26,6 +34,7 @@ class AgentOSApp(App[None]):
 
     BINDINGS = [
         Binding("n", "new_item", "new", show=False),
+        Binding("ctrl+n", "new_subtask", "new subtask", show=False),
         Binding("d", "delete_item", "delete", show=False),
         Binding("r", "refresh_state", "Refresh", show=False),
     ]
@@ -93,28 +102,32 @@ class AgentOSApp(App[None]):
 
     def _update_footer_hints(self, nav: Nav | None) -> None:
         content = self.query_one(ContentPanel)
-        show_new = (
-            not content.is_editing
-            and nav is not None
-            and (
-                nav.kind == "section"
-                and nav.section in ("roles", "milestones", "tasks", "notes", "skills")
-                or nav.kind in ("role", "milestone", "task", "note", "skill")
-            )
-        )
-        show_delete = (
-            not content.is_editing
-            and nav is not None
-            and nav.kind in ("role", "milestone", "task", "note", "skill")
-        )
-        for key, action, show in (
-            ("n", "new_item", show_new),
-            ("d", "delete_item", show_delete),
-        ):
+        editing = content.is_editing
+
+        new_kind: str | None = None
+        if not editing and nav is not None:
+            if nav.kind == "section" and nav.section in _SECTION_TO_KIND:
+                new_kind = _SECTION_TO_KIND[nav.section]
+            elif nav.kind in ("role", "milestone", "task", "note", "skill"):
+                new_kind = nav.kind
+
+        show_new = new_kind is not None
+        show_subtask = not editing and nav is not None and nav.kind == "task"
+        show_delete = not editing and nav is not None and nav.kind in ("role", "milestone", "task", "note", "skill")
+
+        hint_updates: list[tuple[str, str, bool, str | None]] = [
+            ("n", "new_item", show_new, f"new {new_kind}" if new_kind else None),
+            ("ctrl+n", "new_subtask", show_subtask, None),
+            ("d", "delete_item", show_delete, None),
+        ]
+        for key, action, show, desc in hint_updates:
             bindings = self._bindings.key_to_bindings.get(key, [])
             for i, b in enumerate(bindings):
                 if b.action == action:
-                    bindings[i] = replace(b, show=show)
+                    if desc is not None:
+                        bindings[i] = replace(b, show=show, description=desc)
+                    else:
+                        bindings[i] = replace(b, show=show)
         self.screen.refresh_bindings()
 
     # ── Tree navigation ───────────────────────────────────────────────────────
@@ -150,9 +163,9 @@ class AgentOSApp(App[None]):
     # ── Edit mode ─────────────────────────────────────────────────────────────
 
     @on(NavTree.EditRequested)
-    def on_edit_requested(self) -> None:
-        if self.selected and self.selected.kind != "section":
-            self._show_edit()
+    def on_edit_requested(self, event: NavTree.EditRequested) -> None:
+        self.selected = event.nav
+        self._show_edit()
 
     @on(DetailTextArea.ExitRequested)
     def on_exit_requested(self) -> None:
@@ -205,6 +218,9 @@ class AgentOSApp(App[None]):
             if not item:
                 return
             content.show_struct_view(item, self.selected.kind)
+            # Re-focus NavTree: show_struct_view applies -view-struct which makes
+            # StructuredEditor visible; its focusable children can steal focus.
+            self.query_one(NavTree).focus()
 
     def _show_edit(self, select_all: bool = False) -> None:
         content = self.query_one(ContentPanel)
@@ -275,10 +291,15 @@ class AgentOSApp(App[None]):
                 self.store.milestones.save(new_item)
                 kind = "milestone"
             case "tasks":
+                parent: str | None = None
+                if self.selected and self.selected.kind == "task":
+                    current = next((t for t in self.state.tasks if t.id == self.selected.id), None)
+                    parent = current.parent if current else None
                 new_item = Task(
                     id=self.store.tasks.next_id(),
                     title="New Task",
                     start_date=today,
+                    parent=parent,
                 )
                 self.store.tasks.save(new_item)
                 kind = "task"
@@ -303,6 +324,27 @@ class AgentOSApp(App[None]):
         tree.focus_nav(self.selected)
         self._show_edit(select_all=True)
 
+    def action_new_subtask(self) -> None:
+        content = self.query_one(ContentPanel)
+        if content.is_editing or not self.state:
+            return
+        if not self.selected or self.selected.kind != "task":
+            return
+        today = date.today().isoformat()
+        new_item = Task(
+            id=self.store.tasks.next_id(),
+            title="New Task",
+            start_date=today,
+            parent=self.selected.id,
+        )
+        self.store.tasks.save(new_item)
+        self.state = self.store.load()
+        tree = self.query_one(NavTree)
+        tree.populate(self.state, self.root)
+        self.selected = Nav("task", new_item.id, "tasks")
+        tree.focus_nav(self.selected)
+        self._show_edit(select_all=True)
+
     def action_delete_item(self) -> None:
         content = self.query_one(ContentPanel)
         if (
@@ -315,26 +357,35 @@ class AgentOSApp(App[None]):
         item = self._item()
         name = getattr(item, "title", None) or getattr(item, "name", None) or nav.id
 
-        tree = self.query_one(NavTree)
-        section_leaves = [
-            leaf.data
-            for section in tree.root.children
-            for leaf in section.children
-            if isinstance(leaf.data, Nav)
-            and leaf.data.kind in ("role", "milestone", "task", "note", "skill")
-            and leaf.data.section == nav.section
-        ]
-        idx = next((i for i, n in enumerate(section_leaves) if n.id == nav.id), None)
-        if idx is not None and len(section_leaves) > 1:
-            next_nav: Nav = (
-                section_leaves[idx + 1]
-                if idx + 1 < len(section_leaves)
-                else section_leaves[idx - 1]
-            )
-        else:
-            next_nav = Nav("section", "", nav.section)
-
+        next_nav = self._next_nav_after_delete(nav)
         self._confirm_and_delete(nav, name, next_nav)
+
+    def _next_nav_after_delete(self, nav: Nav) -> Nav:
+        """Return the Nav to focus after *nav* is deleted."""
+        if nav.kind == "task" and self.state:
+            deleted = next((t for t in self.state.tasks if t.id == nav.id), None)
+            parent_id = deleted.parent if deleted else None
+            siblings = [t for t in self.state.tasks if t.parent == parent_id]
+            idx = next((i for i, t in enumerate(siblings) if t.id == nav.id), None)
+            if idx is not None and len(siblings) > 1:
+                sibling = siblings[idx + 1] if idx + 1 < len(siblings) else siblings[idx - 1]
+                return Nav("task", sibling.id, "tasks")
+            if parent_id:
+                return Nav("task", parent_id, "tasks")
+        else:
+            tree = self.query_one(NavTree)
+            section_leaves = [
+                node.data
+                for node in tree.iter_all_nodes(tree.root)
+                if isinstance(node.data, Nav)
+                and node.data.kind == nav.kind
+                and node.data.section == nav.section
+            ]
+            idx = next((i for i, n in enumerate(section_leaves) if n.id == nav.id), None)
+            if idx is not None and len(section_leaves) > 1:
+                sibling = section_leaves[idx + 1] if idx + 1 < len(section_leaves) else section_leaves[idx - 1]
+                return sibling
+        return Nav("section", "", nav.section)
 
     @work
     async def _confirm_and_delete(

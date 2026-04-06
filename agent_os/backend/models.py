@@ -48,7 +48,7 @@ class Task(BaseModel):
     end_date: str = ""
     status: TaskStatus = TaskStatus.TODO
     milestone: str | None = None
-    dependencies: list[str] = []
+    parent: str | None = None
     description: str = ""
 
 
