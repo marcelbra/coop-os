@@ -2,6 +2,7 @@
 
 install:  ## Install project dependencies
 	uv sync --group dev
+	git config core.hooksPath .githooks
 
 lint:  ## Check for linting and type errors
 	uv run ruff check agent_os
