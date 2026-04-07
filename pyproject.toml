@@ -20,8 +20,12 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "basedpyright>=1.39.0",
+    "pytest>=8.0.0",
     "ruff>=0.15.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 120

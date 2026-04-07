@@ -1,0 +1,548 @@
+"""Unit tests for agent_os.backend (models, store, parser wrappers)."""
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from agent_os.backend.models import (
+    Doc,
+    Milestone,
+    MilestoneStatus,
+    Note,
+    ProjectState,
+    Role,
+    RoleStatus,
+    Skill,
+    Task,
+    TaskStatus,
+)
+from agent_os.backend.store import (
+    DocStore,
+    MilestoneStore,
+    NoteStore,
+    ProjectStore,
+    RoleStore,
+    SkillStore,
+    TaskStore,
+    _next_id,
+    _slugify,
+)
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+
+def make_root(tmp_path: Path) -> Path:
+    """Return a project root with the agent_os/context structure pre-created."""
+    root = tmp_path / "project"
+    root.mkdir()
+    return root
+
+
+# ── _slugify ──────────────────────────────────────────────────────────────────
+
+
+def test_slugify_basic() -> None:
+    assert _slugify("Hello World") == "hello-world"
+
+
+def test_slugify_strips_special_chars() -> None:
+    assert _slugify("Hello, World!") == "hello-world"
+
+
+def test_slugify_trims_to_40_chars() -> None:
+    long = "a" * 50
+    assert len(_slugify(long)) <= 40
+
+
+def test_slugify_collapses_whitespace() -> None:
+    assert _slugify("foo   bar") == "foo-bar"
+
+
+def test_slugify_empty_string() -> None:
+    assert _slugify("") == ""
+
+
+# ── _next_id ──────────────────────────────────────────────────────────────────
+
+
+def test_next_id_empty_list() -> None:
+    assert _next_id([], "task") == "task-1"
+
+
+def test_next_id_increments() -> None:
+    assert _next_id(["task-1", "task-2", "task-3"], "task") == "task-4"
+
+
+def test_next_id_skips_gaps() -> None:
+    # Uses max, so gaps don't matter
+    assert _next_id(["task-1", "task-5"], "task") == "task-6"
+
+
+def test_next_id_ignores_wrong_prefix() -> None:
+    assert _next_id(["role-1", "role-2"], "task") == "task-1"
+
+
+def test_next_id_ignores_malformed() -> None:
+    assert _next_id(["task-abc", "task-1"], "task") == "task-2"
+
+
+# ── Models ────────────────────────────────────────────────────────────────────
+
+
+def test_role_defaults() -> None:
+    r = Role(id="role-1", title="Engineer")
+    assert r.status == RoleStatus.ACTIVE
+    assert r.description == ""
+
+
+def test_milestone_defaults() -> None:
+    m = Milestone(id="milestone-1", title="Launch")
+    assert m.status == MilestoneStatus.ACTIVE
+    assert m.role is None
+    assert m.start_date == ""
+
+
+def test_task_defaults() -> None:
+    t = Task(id="task-1", title="Write tests")
+    assert t.status == TaskStatus.TODO
+    assert t.parent is None
+    assert t.milestone is None
+
+
+def test_note_defaults() -> None:
+    n = Note(id="note-1", title="My Note")
+    assert n.scanned is False
+    assert n.date == ""
+    assert n.content == ""
+
+
+def test_project_state_empty() -> None:
+    state = ProjectState()
+    assert state.roles == []
+    assert state.tasks == []
+    assert state.errors == []
+
+
+# ── RoleStore ─────────────────────────────────────────────────────────────────
+
+
+def test_role_save_and_load(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = RoleStore(root)
+    role = Role(id="role-1", title="Engineer", description="Build things")
+    store.save(role)
+    roles, errors = store.load_all()
+    assert errors == []
+    assert len(roles) == 1
+    assert roles[0].id == "role-1"
+    assert roles[0].title == "Engineer"
+    assert roles[0].description == "Build things"
+
+
+def test_role_save_updates_existing(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = RoleStore(root)
+    role = Role(id="role-1", title="Engineer")
+    store.save(role)
+    role.title = "Senior Engineer"
+    store.save(role)
+    roles, _ = store.load_all()
+    assert len(roles) == 1
+    assert roles[0].title == "Senior Engineer"
+
+
+def test_role_delete(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = RoleStore(root)
+    role = Role(id="role-1", title="Engineer")
+    store.save(role)
+    assert store.delete("role-1") is True
+    roles, _ = store.load_all()
+    assert roles == []
+
+
+def test_role_delete_nonexistent(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = RoleStore(root)
+    assert store.delete("role-99") is False
+
+
+def test_role_next_id_empty(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = RoleStore(root)
+    assert store.next_id() == "role-1"
+
+
+def test_role_next_id_increments(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = RoleStore(root)
+    store.save(Role(id="role-1", title="A"))
+    store.save(Role(id="role-2", title="B"))
+    assert store.next_id() == "role-3"
+
+
+def test_role_find_path(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = RoleStore(root)
+    role = Role(id="role-1", title="Engineer")
+    store.save(role)
+    path = store.find_path("role-1")
+    assert path is not None
+    assert path.exists()
+
+
+def test_role_load_empty_dir(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = RoleStore(root)
+    roles, errors = store.load_all()
+    assert roles == []
+    assert errors == []
+
+
+def test_role_status_roundtrip(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = RoleStore(root)
+    role = Role(id="role-1", title="Inactive", status=RoleStatus.INACTIVE)
+    store.save(role)
+    roles, _ = store.load_all()
+    assert roles[0].status == RoleStatus.INACTIVE
+
+
+# ── MilestoneStore ────────────────────────────────────────────────────────────
+
+
+def test_milestone_save_and_load(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = MilestoneStore(root)
+    ms = Milestone(id="milestone-1", title="v1.0", start_date="2026-01-01", end_date="2026-06-01", role="role-1")
+    store.save(ms)
+    milestones, errors = store.load_all()
+    assert errors == []
+    assert len(milestones) == 1
+    loaded = milestones[0]
+    assert loaded.id == "milestone-1"
+    assert loaded.title == "v1.0"
+    assert loaded.start_date == "2026-01-01"
+    assert loaded.role == "role-1"
+
+
+def test_milestone_without_role(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = MilestoneStore(root)
+    ms = Milestone(id="milestone-1", title="Standalone")
+    store.save(ms)
+    milestones, _ = store.load_all()
+    assert milestones[0].role is None
+
+
+def test_milestone_delete(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = MilestoneStore(root)
+    ms = Milestone(id="milestone-1", title="v1.0")
+    store.save(ms)
+    assert store.delete("milestone-1") is True
+    milestones, _ = store.load_all()
+    assert milestones == []
+
+
+def test_milestone_next_id(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = MilestoneStore(root)
+    assert store.next_id() == "milestone-1"
+    store.save(Milestone(id="milestone-1", title="A"))
+    assert store.next_id() == "milestone-2"
+
+
+# ── TaskStore ─────────────────────────────────────────────────────────────────
+
+
+def test_task_save_and_load(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = TaskStore(root)
+    task = Task(id="task-1", title="Write tests", description="Do it")
+    store.save(task)
+    tasks, errors = store.load_all()
+    assert errors == []
+    assert len(tasks) == 1
+    assert tasks[0].id == "task-1"
+    assert tasks[0].title == "Write tests"
+    assert tasks[0].description == "Do it"
+    assert tasks[0].parent is None
+
+
+def test_task_save_updates_existing(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = TaskStore(root)
+    task = Task(id="task-1", title="Write tests")
+    store.save(task)
+    task.status = TaskStatus.DONE
+    store.save(task)
+    tasks, _ = store.load_all()
+    assert len(tasks) == 1
+    assert tasks[0].status == TaskStatus.DONE
+
+
+def test_task_delete(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = TaskStore(root)
+    task = Task(id="task-1", title="Write tests")
+    store.save(task)
+    assert store.delete("task-1") is True
+    tasks, _ = store.load_all()
+    assert tasks == []
+
+
+def test_task_delete_nonexistent(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = TaskStore(root)
+    assert store.delete("task-99") is False
+
+
+def test_task_subtask_nesting(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = TaskStore(root)
+    parent = Task(id="task-1", title="Parent")
+    child = Task(id="task-2", title="Child", parent="task-1")
+    store.save(parent)
+    store.save(child)
+    tasks, errors = store.load_all()
+    assert errors == []
+    assert len(tasks) == 2
+    parent_loaded = next(t for t in tasks if t.id == "task-1")
+    child_loaded = next(t for t in tasks if t.id == "task-2")
+    assert parent_loaded.parent is None
+    assert child_loaded.parent == "task-1"
+
+
+def test_task_next_id_empty(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = TaskStore(root)
+    assert store.next_id() == "task-1"
+
+
+def test_task_next_id_with_subtasks(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = TaskStore(root)
+    parent = Task(id="task-1", title="Parent")
+    child = Task(id="task-2", title="Child", parent="task-1")
+    store.save(parent)
+    store.save(child)
+    assert store.next_id() == "task-3"
+
+
+def test_task_find_path(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = TaskStore(root)
+    task = Task(id="task-1", title="My Task")
+    store.save(task)
+    path = store.find_path("task-1")
+    assert path is not None
+    assert path.name == "description.md"
+    assert path.exists()
+
+
+def test_task_with_milestone(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = TaskStore(root)
+    task = Task(id="task-1", title="Ship it", milestone="milestone-1")
+    store.save(task)
+    tasks, _ = store.load_all()
+    assert tasks[0].milestone == "milestone-1"
+
+
+def test_task_load_empty_dir(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = TaskStore(root)
+    tasks, errors = store.load_all()
+    assert tasks == []
+    assert errors == []
+
+
+# ── NoteStore ─────────────────────────────────────────────────────────────────
+
+
+def test_note_save_and_load(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = NoteStore(root)
+    note = Note(id="note-1", title="Daily", date="2026-04-07", content="Some text")
+    store.save(note)
+    notes, errors = store.load_all()
+    assert errors == []
+    assert len(notes) == 1
+    assert notes[0].id == "note-1"
+    assert notes[0].content == "Some text"
+    assert notes[0].date == "2026-04-07"
+
+
+def test_note_scanned_roundtrip(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = NoteStore(root)
+    note = Note(id="note-1", title="Old note", scanned=True)
+    store.save(note)
+    notes, _ = store.load_all()
+    assert notes[0].scanned is True
+
+
+def test_note_delete(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = NoteStore(root)
+    note = Note(id="note-1", title="Delete me")
+    store.save(note)
+    assert store.delete("note-1") is True
+    notes, _ = store.load_all()
+    assert notes == []
+
+
+def test_note_next_id(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = NoteStore(root)
+    assert store.next_id() == "note-1"
+
+
+# ── DocStore ──────────────────────────────────────────────────────────────────
+
+
+def test_doc_save_and_load(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = DocStore(root)
+    doc = Doc(id="doc-1", title="Architecture", content="# Overview\n\nDetails here.")
+    store.save(doc)
+    docs, errors = store.load_all()
+    assert errors == []
+    assert len(docs) == 1
+    assert docs[0].id == "doc-1"
+    assert docs[0].content == "# Overview\n\nDetails here."
+
+
+def test_doc_delete(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = DocStore(root)
+    doc = Doc(id="doc-1", title="Temporary")
+    store.save(doc)
+    assert store.delete("doc-1") is True
+    docs, _ = store.load_all()
+    assert docs == []
+
+
+# ── SkillStore ────────────────────────────────────────────────────────────────
+
+
+def test_skill_save_and_load(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = SkillStore(root)
+    skill = Skill(id="skill-1", command="/check-in", content="Run the check-in flow.")
+    store.save(skill)
+    skills, errors = store.load_all()
+    assert errors == []
+    assert len(skills) == 1
+    assert skills[0].id == "skill-1"
+    assert skills[0].command == "/check-in"
+    assert skills[0].content == "Run the check-in flow."
+
+
+def test_skill_delete(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = SkillStore(root)
+    skill = Skill(id="skill-1", command="/foo")
+    store.save(skill)
+    assert store.delete("skill-1") is True
+    skills, _ = store.load_all()
+    assert skills == []
+
+
+def test_skill_next_id(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = SkillStore(root)
+    assert store.next_id() == "skill-1"
+    store.save(Skill(id="skill-1", command="/a"))
+    assert store.next_id() == "skill-2"
+
+
+# ── ProjectStore (integration) ────────────────────────────────────────────────
+
+
+def test_project_store_load_empty(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    state = ProjectStore(root).load()
+    assert isinstance(state, ProjectState)
+    assert state.roles == []
+    assert state.milestones == []
+    assert state.tasks == []
+    assert state.notes == []
+    assert state.docs == []
+    assert state.skills == []
+    assert state.errors == []
+
+
+def test_project_store_load_all_types(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    ps = ProjectStore(root)
+    ps.roles.save(Role(id="role-1", title="Engineer"))
+    ps.milestones.save(Milestone(id="milestone-1", title="v1.0"))
+    ps.tasks.save(Task(id="task-1", title="Ship it"))
+    ps.notes.save(Note(id="note-1", title="Daily"))
+    ps.docs.save(Doc(id="doc-1", title="Spec"))
+    ps.skills.save(Skill(id="skill-1", command="/check-in"))
+
+    state = ps.load()
+    assert len(state.roles) == 1
+    assert len(state.milestones) == 1
+    assert len(state.tasks) == 1
+    assert len(state.notes) == 1
+    assert len(state.docs) == 1
+    assert len(state.skills) == 1
+    assert state.errors == []
+
+
+def test_project_store_find_item_path(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    ps = ProjectStore(root)
+    ps.roles.save(Role(id="role-1", title="Engineer"))
+    ps.tasks.save(Task(id="task-1", title="Ship it"))
+
+    assert ps.find_item_path("role", "role-1") is not None
+    assert ps.find_item_path("task", "task-1") is not None
+    assert ps.find_item_path("role", "role-99") is None
+    assert ps.find_item_path("unknown", "role-1") is None
+
+
+# ── Parser wrappers ───────────────────────────────────────────────────────────
+
+
+def test_parser_read_project(tmp_path: Path) -> None:
+    from agent_os.backend.parser import read_project
+
+    root = make_root(tmp_path)
+    ProjectStore(root).roles.save(Role(id="role-1", title="Engineer"))
+    state = read_project(root)
+    assert len(state.roles) == 1
+
+
+def test_parser_write_and_read_role(tmp_path: Path) -> None:
+    from agent_os.backend.parser import read_roles, write_role
+
+    root = make_root(tmp_path)
+    write_role(root, Role(id="role-1", title="Designer"))
+    roles, errors = read_roles(root)
+    assert errors == []
+    assert roles[0].title == "Designer"
+
+
+def test_parser_delete_task(tmp_path: Path) -> None:
+    from agent_os.backend.parser import delete_task, write_task
+
+    root = make_root(tmp_path)
+    write_task(root, Task(id="task-1", title="Temp"))
+    assert delete_task(root, "task-1") is True
+
+
+def test_parser_next_ids(tmp_path: Path) -> None:
+    from agent_os.backend.parser import next_milestone_id, next_note_id, next_role_id, next_task_id
+
+    root = make_root(tmp_path)
+    assert next_role_id(root) == "role-1"
+    assert next_milestone_id(root) == "milestone-1"
+    assert next_task_id(root) == "task-1"
+    assert next_note_id(root) == "note-1"

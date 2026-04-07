@@ -1,4 +1,4 @@
-.PHONY: install lint format fix run
+.PHONY: install lint format fix run test
 
 install:  ## Install project dependencies
 	uv sync --group dev
@@ -13,6 +13,9 @@ format:  ## Format the code
 
 fix:  ## Auto-fix ruff errors
 	uv run ruff check --fix agent_os
+
+test:  ## Run the test suite
+	uv run pytest tests/
 
 run:  ## Start the TUI
 	uv run agent-os start

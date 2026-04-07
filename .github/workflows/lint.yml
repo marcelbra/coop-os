@@ -23,3 +23,6 @@ jobs:
 
       - name: Run basedpyright
         run: uv run basedpyright agent_os
+
+      - name: Run tests
+        run: uv run pytest tests/
