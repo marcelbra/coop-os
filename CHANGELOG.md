@@ -17,9 +17,9 @@ Initial beta release.
   - Inline dropdown selectors for status, milestone, and other fields
   - Date field validation
   - Text editing keyboard shortcuts
-- **CLI**: `agent-os start [--root PATH]`
+- **CLI**: `coop-os start [--root PATH]`
 - **Backend**: markdown + YAML frontmatter storage via `python-frontmatter`; Pydantic models
 - **Config**: `config.yml` for UI symbol customization
 - **Built-in skills**: `/check-in`, `/check-out`, `/scan-notes`, `/weekly-review`
 - **CI**: ruff + basedpyright + pytest on every push/PR
-- **Packaging**: installable via `pip install agent-os`, entry point `agent-os`
+- **Packaging**: installable via `pip install coop-os`, entry point `coop-os`

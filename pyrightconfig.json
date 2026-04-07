@@ -1,6 +1,6 @@
 {
   "pythonVersion": "3.13",
-  "include": ["agent_os"],
+  "include": ["coop_os"],
   "reportUnknownParameterType": "none",
   "reportMissingParameterType": "none",
   "reportUnknownArgumentType": "none",

@@ -2,6 +2,6 @@
 set -e
 
 echo "Running linters..."
-uv run ruff check agent_os
-uv run basedpyright agent_os
+uv run ruff check coop_os
+uv run basedpyright coop_os
 echo "Lint passed."

@@ -7,9 +7,9 @@ from textual.message import Message
 from textual.widgets import Tree
 from textual.widgets._tree import TreeNode
 
-from agent_os.backend.models import ProjectState, Task
-from agent_os.tui.nav import Nav, truncate_label
-from agent_os.tui.widgets.config import SCANNED_ICONS, AppConfig, read_config
+from coop_os.backend.models import ProjectState, Task
+from coop_os.tui.nav import Nav, truncate_label
+from coop_os.tui.widgets.config import SCANNED_ICONS, AppConfig, read_config
 
 
 class NavTree(Tree[Nav | None]):
@@ -165,7 +165,7 @@ class NavTree(Tree[Nav | None]):
             for s in state.skills:
                 skills.add_leaf(truncate_label(s.command), data=Nav("skill", s.id, "skills"))
 
-        if (root / "agent_os" / "context" / "AGENT.md").exists():
+        if (root / "coop_os" / "context" / "AGENT.md").exists():
             self.root.add_leaf("AGENT.md", data=Nav("agent", "agent", ""))
 
     def focus_nav(self, nav: Nav) -> None:

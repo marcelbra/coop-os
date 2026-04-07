@@ -3,11 +3,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from agent_os.tui import AgentOSApp
+from coop_os.tui import CoopOSApp
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="agent-os: personal life OS")
+    p = argparse.ArgumentParser(description="coop-os: personal life OS")
     sub = p.add_subparsers(dest="cmd")
 
     start = sub.add_parser("start", help="Start the TUI")
@@ -17,7 +17,7 @@ def main() -> None:
     args = p.parse_args()
 
     if args.cmd == "start":
-        AgentOSApp(root=args.root.resolve()).run()
+        CoopOSApp(root=args.root.resolve()).run()
     else:
         p.print_help()
 

@@ -6,7 +6,7 @@ from typing import Any
 from textual.events import Key
 from textual.message import Message
 
-from agent_os.tui.widgets.field_input import FieldInput
+from coop_os.tui.widgets.field_input import FieldInput
 
 
 class DateFieldInput(FieldInput):

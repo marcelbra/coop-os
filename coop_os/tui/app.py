@@ -11,12 +11,12 @@ from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import Footer, Tree
 
-from agent_os.backend.models import Doc, Milestone, Note, ProjectState, Role, Skill, Task
-from agent_os.backend.store import ProjectStore
-from agent_os.tui.confirm_delete import ConfirmDeleteScreen
-from agent_os.tui.nav import Nav
-from agent_os.tui.styles import CSS as APP_CSS
-from agent_os.tui.widgets import ContentPanel, DetailTextArea, FixedHeader, NavTree, SelectInput, StructuredEditor
+from coop_os.backend.models import Doc, Milestone, Note, ProjectState, Role, Skill, Task
+from coop_os.backend.store import ProjectStore
+from coop_os.tui.confirm_delete import ConfirmDeleteScreen
+from coop_os.tui.nav import Nav
+from coop_os.tui.styles import CSS as APP_CSS
+from coop_os.tui.widgets import ContentPanel, DetailTextArea, FixedHeader, NavTree, SelectInput, StructuredEditor
 
 _SECTION_TO_KIND: dict[str, str] = {
     "roles": "role",
@@ -28,8 +28,8 @@ _SECTION_TO_KIND: dict[str, str] = {
 }
 
 
-class AgentOSApp(App[None]):
-    TITLE = "agent-os"
+class CoopOSApp(App[None]):
+    TITLE = "coop-os"
     CSS = APP_CSS
     ENABLE_COMMAND_PALETTE = False
 
@@ -52,7 +52,7 @@ class AgentOSApp(App[None]):
     def compose(self) -> ComposeResult:
         yield FixedHeader()
         with Horizontal():
-            yield NavTree("agent-os", id="nav")
+            yield NavTree("coop-os", id="nav")
             yield ContentPanel(id="content")
         yield Footer()
 
@@ -100,7 +100,7 @@ class AgentOSApp(App[None]):
         if not self.selected:
             return None
         if self.selected.kind == "agent":
-            return self.root / "agent_os" / "context" / "AGENT.md"
+            return self.root / "coop_os" / "context" / "AGENT.md"
         return self.store.find_item_path(self.selected.kind, self.selected.id)
 
     def _update_footer_hints(self, nav: Nav | None) -> None:

@@ -8,7 +8,7 @@ from typing import Any, Protocol
 
 import frontmatter
 
-from agent_os.backend.models import (
+from coop_os.backend.models import (
     Doc,
     Milestone,
     Note,
@@ -115,7 +115,7 @@ class FlatFileStore[T: _HasId](ABC):
     """Base class for stores that persist each item as a single .md file."""
 
     def __init__(self, root: Path, rel_dir: str, prefix: str, label: str | None = None) -> None:
-        self._dir = root / "agent_os" / rel_dir
+        self._dir = root / "coop_os" / rel_dir
         self._prefix = prefix
         self._label = label or (prefix + "s")
 
@@ -223,7 +223,7 @@ class MilestoneStore(FlatFileStore[Milestone]):
 class TaskStore:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self._dir = root / "agent_os" / "context" / "tasks"
+        self._dir = root / "coop_os" / "context" / "tasks"
 
     def _load_from_dir(
         self, search_dir: Path, parent_id: str | None, tasks: list[Task], errors: list[ParseError]
@@ -345,7 +345,7 @@ class DocStore(FlatFileStore[Doc]):
 
 class SkillStore(FlatFileStore[Skill]):
     def __init__(self, root: Path) -> None:
-        super().__init__(root, "skills", "skill", label="agent_os/skills")
+        super().__init__(root, "skills", "skill", label="coop_os/skills")
 
     def _parse(self, meta: dict[str, Any], content: str) -> Skill:
         return Skill(

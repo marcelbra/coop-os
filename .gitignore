@@ -17,9 +17,9 @@ Thumbs.db
 .idea/
 .claude/
 
-# Personal data (agent_os/context/ — only templates tracked)
-agent_os/context/roles/*
-agent_os/context/milestones/*
-agent_os/context/notes/*
-agent_os/context/tasks/*
-!agent_os/context/tasks/template.md
+# Personal data (coop_os/context/ — only templates tracked)
+coop_os/context/roles/*
+coop_os/context/milestones/*
+coop_os/context/notes/*
+coop_os/context/tasks/*
+!coop_os/context/tasks/template.md

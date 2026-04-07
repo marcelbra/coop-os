@@ -10,10 +10,10 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Label, Rule
 
-from agent_os.backend.models import ProjectState
-from agent_os.tui.widgets.body_text_area import BodyTextArea
-from agent_os.tui.widgets.calendar import CalendarWidget
-from agent_os.tui.widgets.config import (
+from coop_os.backend.models import ProjectState
+from coop_os.tui.widgets.body_text_area import BodyTextArea
+from coop_os.tui.widgets.calendar import CalendarWidget
+from coop_os.tui.widgets.config import (
     BODY_ATTR,
     DATE_FIELDS,
     FIELD_DEFS,
@@ -22,9 +22,9 @@ from agent_os.tui.widgets.config import (
     AppConfig,
     read_config,
 )
-from agent_os.tui.widgets.date_field_input import DateFieldInput
-from agent_os.tui.widgets.field_input import FieldInput
-from agent_os.tui.widgets.select_input import SelectInput
+from coop_os.tui.widgets.date_field_input import DateFieldInput
+from coop_os.tui.widgets.field_input import FieldInput
+from coop_os.tui.widgets.select_input import SelectInput
 
 
 class StructuredEditor(Widget):

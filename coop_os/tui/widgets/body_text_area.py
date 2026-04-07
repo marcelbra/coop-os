@@ -4,8 +4,8 @@ from typing import Any
 
 from textual.events import Key
 
-from agent_os.tui.widgets.field_input import FieldInput
-from agent_os.tui.widgets.text_area import DetailTextArea
+from coop_os.tui.widgets.field_input import FieldInput
+from coop_os.tui.widgets.text_area import DetailTextArea
 
 
 class BodyTextArea(DetailTextArea):

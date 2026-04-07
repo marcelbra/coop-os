@@ -6,8 +6,8 @@ from textual.containers import ScrollableContainer
 from textual.widget import Widget
 from textual.widgets import Markdown
 
-from agent_os.tui.widgets.structured_editor import StructuredEditor
-from agent_os.tui.widgets.text_area import DetailTextArea
+from coop_os.tui.widgets.structured_editor import StructuredEditor
+from coop_os.tui.widgets.text_area import DetailTextArea
 
 
 class ContentPanel(Widget):

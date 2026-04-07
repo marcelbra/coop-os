@@ -19,10 +19,10 @@ jobs:
         run: uv sync --group dev
 
       - name: Run ruff
-        run: uv run ruff check agent_os
+        run: uv run ruff check coop_os
 
       - name: Run basedpyright
-        run: uv run basedpyright agent_os
+        run: uv run basedpyright coop_os
 
       - name: Run tests
         run: uv run pytest tests/

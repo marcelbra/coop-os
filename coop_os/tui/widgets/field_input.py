@@ -7,7 +7,7 @@ from textual.events import Key
 from textual.message import Message
 from textual.widgets import Input
 
-from agent_os.tui.widgets.text_area import DetailTextArea
+from coop_os.tui.widgets.text_area import DetailTextArea
 
 
 class FieldInput(Input):

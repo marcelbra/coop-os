@@ -1,5 +1,5 @@
 [project]
-name = "agent-os"
+name = "coop-os"
 version = "0.1.0"
 description = "Personal life OS — markdown-backed, browser UI"
 license = { file = "LICENSE" }
@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-agent-os = "agent_os.main:main"
+coop-os = "coop_os.main:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -47,7 +47,7 @@ select = [
 [tool.ruff.lint.isort]
 combine-as-imports = true
 order-by-type = true
-known-first-party = ["agent_os"]
+known-first-party = ["coop_os"]
 
 [tool.basedpyright]
 pythonVersion = "3.13"

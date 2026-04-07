@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import cast
 
-from agent_os.backend.models import Doc, Milestone, Note, Role, Task
-from agent_os.tui.widgets.config import SCANNED_ICONS
+from coop_os.backend.models import Doc, Milestone, Note, Role, Task
+from coop_os.tui.widgets.config import SCANNED_ICONS
 
 
 def to_md(item: Role | Milestone | Task | Note | Doc, kind: str) -> str:

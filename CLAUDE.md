@@ -17,15 +17,15 @@
 1. Branch off `origin/main` (not local main): `git checkout -b <branch> origin/main`
 2. Make focused, atomic commits
 3. Push to `origin`: `git push origin <branch>`
-4. Open PR against `main` on `marcelbra/agent-os`:
+4. Open PR against `main` on `marcelbra/coop-os`:
    ```
-   gh pr create --repo marcelbra/agent-os --base main --head <branch>
+   gh pr create --repo marcelbra/coop-os --base main --head <branch>
    ```
 5. Group changes by concern — one logical unit per PR
 
 ### Merging
 
-Use squash merge: `gh pr merge <n> --repo marcelbra/agent-os --squash --delete-branch`
+Use squash merge: `gh pr merge <n> --repo marcelbra/coop-os --squash --delete-branch`
 
 **Always wait 5 seconds after creating a PR before merging** — GitHub needs a moment to register the PR or pushes may fail. Use `sleep 5` between the `gh pr create` and `gh pr merge` calls.
 

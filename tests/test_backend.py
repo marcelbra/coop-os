@@ -1,11 +1,11 @@
-"""Unit tests for agent_os.backend (models, store, parser wrappers)."""
+"""Unit tests for coop_os.backend (models, store, parser wrappers)."""
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
 
-from agent_os.backend.models import (
+from coop_os.backend.models import (
     Doc,
     Milestone,
     MilestoneStatus,
@@ -17,7 +17,7 @@ from agent_os.backend.models import (
     Task,
     TaskStatus,
 )
-from agent_os.backend.store import (
+from coop_os.backend.store import (
     DocStore,
     MilestoneStore,
     NoteStore,
@@ -34,7 +34,7 @@ from agent_os.backend.store import (
 
 
 def make_root(tmp_path: Path) -> Path:
-    """Return a project root with the agent_os/context structure pre-created."""
+    """Return a project root with the coop_os/context structure pre-created."""
     root = tmp_path / "project"
     root.mkdir()
     return root
@@ -512,7 +512,7 @@ def test_project_store_find_item_path(tmp_path: Path) -> None:
 
 
 def test_parser_read_project(tmp_path: Path) -> None:
-    from agent_os.backend.parser import read_project
+    from coop_os.backend.parser import read_project
 
     root = make_root(tmp_path)
     ProjectStore(root).roles.save(Role(id="role-1", title="Engineer"))
@@ -521,7 +521,7 @@ def test_parser_read_project(tmp_path: Path) -> None:
 
 
 def test_parser_write_and_read_role(tmp_path: Path) -> None:
-    from agent_os.backend.parser import read_roles, write_role
+    from coop_os.backend.parser import read_roles, write_role
 
     root = make_root(tmp_path)
     write_role(root, Role(id="role-1", title="Designer"))
@@ -531,7 +531,7 @@ def test_parser_write_and_read_role(tmp_path: Path) -> None:
 
 
 def test_parser_delete_task(tmp_path: Path) -> None:
-    from agent_os.backend.parser import delete_task, write_task
+    from coop_os.backend.parser import delete_task, write_task
 
     root = make_root(tmp_path)
     write_task(root, Task(id="task-1", title="Temp"))
@@ -539,7 +539,7 @@ def test_parser_delete_task(tmp_path: Path) -> None:
 
 
 def test_parser_next_ids(tmp_path: Path) -> None:
-    from agent_os.backend.parser import next_milestone_id, next_note_id, next_role_id, next_task_id
+    from coop_os.backend.parser import next_milestone_id, next_note_id, next_role_id, next_task_id
 
     root = make_root(tmp_path)
     assert next_role_id(root) == "role-1"
