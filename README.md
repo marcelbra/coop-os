@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="banner.png" alt="coop-os" width="100%">
-</p>
-
 <h1 align="center">coop-os</h1>
 <p align="center">The personal OS where you and your agent work as one</p>
 
@@ -12,10 +8,9 @@
   <a href="https://github.com/marcelbra/coop-os/actions"><img src="https://img.shields.io/github/actions/workflow/status/marcelbra/coop-os/lint.yml?label=CI" alt="CI"></a>
 </p>
 
----
-
-<!-- screenshot placeholder — replace with actual TUI screenshot -->
-<!-- ![coop-os screenshot](screenshot.png) -->
+<p align="center">
+  <img src="banner.png" alt="coop-os" width="75%">
+</p>
 
 ---
 
