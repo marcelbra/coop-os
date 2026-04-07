@@ -1,4 +1,7 @@
 <h1 align="center">coop-os</h1>
+
+---
+
 <p align="center">The personal OS where you and your agent work as one</p>
 
 <p align="center">
@@ -8,11 +11,12 @@
   <a href="https://github.com/marcelbra/coop-os/actions"><img src="https://img.shields.io/github/actions/workflow/status/marcelbra/coop-os/lint.yml?label=CI" alt="CI"></a>
 </p>
 
+---
+
 <p align="center">
-  <img src="banner.png" alt="coop-os" width="75%">
+  <img src="banner.png" alt="coop-os" width="70%">
 </p>
 
----
 
 A lightweight context layer for human-AI co-working. Plain markdown files your agent can read and edit directly — a keyboard-driven TUI so you can navigate and update everything yourself.
 
