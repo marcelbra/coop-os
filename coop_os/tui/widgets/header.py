@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from textual.widgets import Header
+from textual.app import RenderResult
+from textual.widget import Widget
 
 
-class FixedHeader(Header):
-    """Header that does not grow when clicked."""
+class FixedHeader(Widget):
+    """A simple non-interactive header that displays the app title."""
 
-    def _on_click(self) -> None:
-        pass
+    def render(self) -> RenderResult:
+        return self.app.title

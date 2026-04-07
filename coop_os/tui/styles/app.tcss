@@ -190,3 +190,14 @@ CalendarWidget {
 CalendarWidget:focus {
     border-left: heavy #58a6ff;
 }
+
+/* ── FixedHeader ──────────────────────────────────────────────────────────── */
+
+FixedHeader {
+    dock: top;
+    width: 100%;
+    height: 1;
+    background: $panel;
+    color: $foreground;
+    content-align: center middle;
+}
