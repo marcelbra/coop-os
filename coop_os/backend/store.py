@@ -168,7 +168,7 @@ class FlatFileStore[T: _HasId](ABC):
 
 class RoleStore(FlatFileStore[Role]):
     def __init__(self, root: Path) -> None:
-        super().__init__(root, "context/roles", "role")
+        super().__init__(root, "work/roles", "role")
 
     def _parse(self, meta: dict[str, Any], content: str) -> Role:
         return Role(
@@ -191,7 +191,7 @@ class RoleStore(FlatFileStore[Role]):
 
 class MilestoneStore(FlatFileStore[Milestone]):
     def __init__(self, root: Path) -> None:
-        super().__init__(root, "context/milestones", "milestone")
+        super().__init__(root, "work/milestones", "milestone")
 
     def _parse(self, meta: dict[str, Any], content: str) -> Milestone:
         return Milestone(
@@ -223,7 +223,7 @@ class MilestoneStore(FlatFileStore[Milestone]):
 class TaskStore:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self._dir = root / "coop_os" / "context" / "tasks"
+        self._dir = root / "coop_os" / "work" / "tasks"
 
     def _load_from_dir(
         self, search_dir: Path, parent_id: str | None, tasks: list[Task], errors: list[ParseError]
@@ -302,7 +302,7 @@ class TaskStore:
 
 class NoteStore(FlatFileStore[Note]):
     def __init__(self, root: Path) -> None:
-        super().__init__(root, "context/notes", "note")
+        super().__init__(root, "user/notes", "note")
 
     def _parse(self, meta: dict[str, Any], content: str) -> Note:
         return Note(
@@ -327,7 +327,7 @@ class NoteStore(FlatFileStore[Note]):
 
 class DocStore(FlatFileStore[Doc]):
     def __init__(self, root: Path) -> None:
-        super().__init__(root, "context/docs", "doc")
+        super().__init__(root, "user/context", "doc")
 
     def _parse(self, meta: dict[str, Any], content: str) -> Doc:
         return Doc(
@@ -345,7 +345,7 @@ class DocStore(FlatFileStore[Doc]):
 
 class SkillStore(FlatFileStore[Skill]):
     def __init__(self, root: Path) -> None:
-        super().__init__(root, "skills", "skill", label="coop_os/skills")
+        super().__init__(root, "agent/skills", "skill", label="coop_os/agent/skills")
 
     def _parse(self, meta: dict[str, Any], content: str) -> Skill:
         return Skill(

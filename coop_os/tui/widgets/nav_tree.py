@@ -16,6 +16,9 @@ from coop_os.tui.widgets.config import SCANNED_ICONS, AppConfig, read_config
 class NavTree(Tree[Nav | None]):
     """File tree widget.  Owns navigation state; communicates via messages."""
 
+    ICON_NODE = ""
+    ICON_NODE_EXPANDED = ""
+
     class EditRequested(Message):
         """User pressed → on a node and wants to enter edit mode."""
 
@@ -185,7 +188,7 @@ class NavTree(Tree[Nav | None]):
         # ── Agent group ───────────────────────────────────────────
         _add_group_header("Agent")
         _add_separator()
-        if (root / "coop_os" / "context" / "AGENT.md").exists():
+        if (root / "coop_os" / "agent" / "AGENT.md").exists():
             self.root.add_leaf("◈  AGENT.md", data=Nav("agent", "agent", ""))
         if state.skills:
             skills = self.root.add(
