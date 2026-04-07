@@ -1,9 +1,23 @@
-![coop-os banner](banner.png)
+<p align="center">
+  <img src="banner.png" alt="coop-os" width="100%">
+</p>
 
-[![PyPI version](https://img.shields.io/pypi/v/coop-os)](https://pypi.org/project/coop-os/)
-[![Python](https://img.shields.io/pypi/pyversions/coop-os)](https://pypi.org/project/coop-os/)
-[![License](https://img.shields.io/github/license/marcelbra/coop-os)](LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/marcelbra/coop-os/lint.yml?label=CI)](https://github.com/marcelbra/coop-os/actions)
+<h1 align="center">coop-os</h1>
+<p align="center">The personal OS where you and your agent work as one</p>
+
+<p align="center">
+  <a href="https://pypi.org/project/coop-os/"><img src="https://img.shields.io/pypi/v/coop-os" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/coop-os/"><img src="https://img.shields.io/pypi/pyversions/coop-os" alt="Python"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/marcelbra/coop-os" alt="License"></a>
+  <a href="https://github.com/marcelbra/coop-os/actions"><img src="https://img.shields.io/github/actions/workflow/status/marcelbra/coop-os/lint.yml?label=CI" alt="CI"></a>
+</p>
+
+---
+
+<!-- screenshot placeholder — replace with actual TUI screenshot -->
+<!-- ![coop-os screenshot](screenshot.png) -->
+
+---
 
 A lightweight context layer for human-AI co-working. Plain markdown files your agent can read and edit directly — a keyboard-driven TUI so you can navigate and update everything yourself.
 
@@ -35,8 +49,8 @@ coop_os/context/
 ## Install
 
 ```bash
-uv sync
-make run
+pip install coop-os
+coop-os start
 ```
 
 Requires Python 3.13+.
