@@ -21,4 +21,5 @@ Thumbs.db
 coop_os/work/roles/*
 coop_os/work/milestones/*
 coop_os/user/notes/*
+coop_os/user/context/*
 coop_os/work/tasks/*
