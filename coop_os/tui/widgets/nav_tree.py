@@ -185,63 +185,109 @@ class NavTree(Tree[Nav | None]):
 
     # ── Data methods ──────────────────────────────────────────────────────
 
-    def populate(self, state: ProjectState, root: Path) -> None:
-        """Rebuild tree from *state*, preserving section expansion."""
+    def _expanded_state(self) -> tuple[set[str], set[str]]:
+        all_nodes = self.iter_all_nodes(self.root)
         expanded = {
-            node.data.section
-            for node in self.iter_all_nodes(self.root)
-            if isinstance(node.data, Nav) and node.data.kind == "section" and node.is_expanded
+            n.data.section
+            for n in all_nodes
+            if isinstance(n.data, Nav) and n.data.kind == "section" and n.is_expanded
         }
         expanded_tasks = {
-            node.data.id
-            for node in self.iter_all_nodes(self.root)
-            if isinstance(node.data, Nav) and node.data.kind == "task" and node.is_expanded
+            n.data.id
+            for n in all_nodes
+            if isinstance(n.data, Nav) and n.data.kind == "task" and n.is_expanded
         }
-        self.clear()
+        return expanded, expanded_tasks
 
-        cfg = read_config(root)
+    @staticmethod
+    def _section_label(arrow: str, name: str, filtered: bool) -> Text:
+        t = Text()
+        t.append(f"{arrow}  {name}")
+        if filtered:
+            t.append(" ·", style="#58a6ff")
+        return t
 
-        def _add_group_header(label: str) -> None:
-            self.root.add_leaf(Text(label, style="#7a9eb8"), data=Nav("group", "", ""))
-
-        def _add_separator() -> None:
-            line = "─" * 22
-            self.root.add_leaf(Text(line, style="#30363d"), data=Nav("separator", "", ""))
-
-        # ── Workspaces group ──────────────────────────────────────
-        _add_group_header("Workspaces")
-        _add_separator()
-        roles = self.root.add(
-            f"{'▼' if 'roles' in expanded else '▶'}  Roles",
+    def _build_workspaces(
+        self,
+        state: ProjectState,
+        expanded: set[str],
+        expanded_tasks: set[str],
+        cfg: AppConfig,
+        role_filters: set[str],
+        milestone_filters: set[str],
+        task_filters: set[str],
+    ) -> None:
+        roles_arrow = "▼" if "roles" in expanded else "▶"
+        roles_node = self.root.add(
+            self._section_label(roles_arrow, "Roles", bool(role_filters)),
             data=Nav("section", "", "roles"),
             expand="roles" in expanded,
         )
         for r in state.roles:
-            roles.add_leaf(
+            if role_filters and r.status not in role_filters:
+                continue
+            roles_node.add_leaf(
                 truncate_label(f"{cfg.role_statuses.get(r.status, '•')} {r.title}"),
                 data=Nav("role", r.id, "roles"),
             )
-        ms = self.root.add(
-            f"{'▼' if 'milestones' in expanded else '▶'}  Milestones",
+        ms_arrow = "▼" if "milestones" in expanded else "▶"
+        ms_node = self.root.add(
+            self._section_label(ms_arrow, "Milestones", bool(milestone_filters)),
             data=Nav("section", "", "milestones"),
             expand="milestones" in expanded,
         )
         for m in state.milestones:
-            ms.add_leaf(
+            if milestone_filters and m.status not in milestone_filters:
+                continue
+            ms_node.add_leaf(
                 truncate_label(f"{cfg.milestone_statuses.get(m.status, '•')} {m.title}"),
                 data=Nav("milestone", m.id, "milestones"),
             )
+        tasks_arrow = "▼" if "tasks" in expanded else "▶"
         tasks_node = self.root.add(
-            f"{'▼' if 'tasks' in expanded else '▶'}  Tasks",
+            self._section_label(tasks_arrow, "Tasks", bool(task_filters)),
             data=Nav("section", "", "tasks"),
             expand="tasks" in expanded,
         )
-        self._add_task_nodes(tasks_node, state.tasks, None, cfg, expanded_tasks)
-        _add_separator()
+        self._add_task_nodes(tasks_node, state.tasks, None, cfg, expanded_tasks, task_filters)
+
+    def populate(
+        self,
+        state: ProjectState,
+        root: Path,
+        role_filters: set[str] | None = None,
+        milestone_filters: set[str] | None = None,
+        task_filters: set[str] | None = None,
+    ) -> None:
+        """Rebuild tree from *state*, preserving section expansion.
+
+        A non-empty *_filters* set restricts that section to matching statuses.
+        An empty set (or None) shows everything.
+        """
+        role_filters = role_filters or set()
+        milestone_filters = milestone_filters or set()
+        task_filters = task_filters or set()
+
+        expanded, expanded_tasks = self._expanded_state()
+        self.clear()
+
+        cfg = read_config(root)
+
+        def _header(label: str) -> None:
+            self.root.add_leaf(Text(label, style="#7a9eb8"), data=Nav("group", "", ""))
+
+        def _sep() -> None:
+            self.root.add_leaf(Text("─" * 22, style="#30363d"), data=Nav("separator", "", ""))
+
+        # ── Workspaces group ──────────────────────────────────────
+        _header("Workspaces")
+        _sep()
+        self._build_workspaces(state, expanded, expanded_tasks, cfg, role_filters, milestone_filters, task_filters)
+        _sep()
 
         # ── User group ────────────────────────────────────────────
-        _add_group_header("User")
-        _add_separator()
+        _header("User")
+        _sep()
         docs = self.root.add(
             "○  Context", data=Nav("section", "", "docs"), expand="docs" in expanded
         )
@@ -253,11 +299,11 @@ class NavTree(Tree[Nav | None]):
         for n in state.notes:
             icon = SCANNED_ICONS["true"] if n.scanned else SCANNED_ICONS["false"]
             notes.add_leaf(truncate_label(f"{icon} {n.title}"), data=Nav("note", n.id, "notes"))
-        _add_separator()
+        _sep()
 
         # ── Agent group ───────────────────────────────────────────
-        _add_group_header("Agent")
-        _add_separator()
+        _header("Agent")
+        _sep()
         if (root / "coop_os" / "agent" / "AGENT.md").exists():
             self.root.add_leaf("◈  AGENT.md", data=Nav("agent", "agent", ""))
         if state.skills:
@@ -268,7 +314,7 @@ class NavTree(Tree[Nav | None]):
             )
             for s in state.skills:
                 skills.add_leaf(truncate_label(s.command), data=Nav("skill", s.id, "skills"))
-        _add_separator()
+        _sep()
 
     def focus_nav(self, nav: Nav) -> None:
         """Move the tree cursor to *nav*, expanding its section if needed."""
@@ -307,14 +353,17 @@ class NavTree(Tree[Nav | None]):
         parent_id: str | None,
         cfg: AppConfig,
         expanded_tasks: set[str],
+        task_filters: set[str],
     ) -> None:
         children = [t for t in all_tasks if t.parent == parent_id]
         for t in children:
+            if task_filters and t.status not in task_filters:
+                continue
             label = truncate_label(f"{cfg.task_statuses.get(t.status, '•')} {t.title}")
             has_subtasks = any(c.parent == t.id for c in all_tasks)
             nav = Nav("task", t.id, "tasks")
             if has_subtasks:
                 branch = parent_node.add(label, data=nav, expand=t.id in expanded_tasks)
-                self._add_task_nodes(branch, all_tasks, t.id, cfg, expanded_tasks)
+                self._add_task_nodes(branch, all_tasks, t.id, cfg, expanded_tasks, task_filters)
             else:
                 parent_node.add_leaf(label, data=nav)

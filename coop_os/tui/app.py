@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,14 +8,23 @@ from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
-from textual.widgets import Footer, Tree
+from textual.widgets import Tree
 
 from coop_os.backend.models import Doc, Milestone, Note, ProjectState, Role, Skill, Task
 from coop_os.backend.store import ProjectStore
 from coop_os.tui.confirm_delete import ConfirmDeleteScreen
+from coop_os.tui.filter_screen import FilterScreen
 from coop_os.tui.nav import Nav
 from coop_os.tui.styles import CSS as APP_CSS
-from coop_os.tui.widgets import ContentPanel, DetailTextArea, FixedHeader, NavTree, SelectInput, StructuredEditor
+from coop_os.tui.widgets import (
+    ContentPanel,
+    DetailTextArea,
+    FixedHeader,
+    NavTree,
+    SelectInput,
+    SplitFooter,
+    StructuredEditor,
+)
 
 _SECTION_TO_KIND: dict[str, str] = {
     "roles": "role",
@@ -34,10 +42,13 @@ class CoopOSApp(App[None]):
     ENABLE_COMMAND_PALETTE = False
 
     BINDINGS = [
+        Binding("r", "filter_roles", "role", show=False),
+        Binding("m", "filter_milestones", "milestone", show=False),
+        Binding("t", "filter_tasks", "task", show=False),
         Binding("n", "new_item", "new", show=False),
         Binding("ctrl+n", "new_subtask", "new subtask", show=False),
         Binding("d", "delete_item", "delete", show=False),
-        Binding("r", "refresh_state", "Refresh", show=False),
+        Binding("ctrl+r", "refresh_state", "Refresh", show=False),
     ]
 
     def __init__(self, root: Path) -> None:
@@ -46,6 +57,9 @@ class CoopOSApp(App[None]):
         self.store = ProjectStore(root)
         self.state: ProjectState | None = None
         self.selected: Nav | None = Nav("section", "", "roles")
+        self.role_filters: set[str] = set()
+        self.milestone_filters: set[str] = set()
+        self.task_filters: set[str] = set()
 
     # ── Layout ────────────────────────────────────────────────────────────────
 
@@ -54,17 +68,18 @@ class CoopOSApp(App[None]):
         with Horizontal():
             yield NavTree("coop-os", id="nav")
             yield ContentPanel(id="content")
-        yield Footer()
+        yield SplitFooter()
 
     def on_mount(self) -> None:
         self._reload()
+        self._update_right_hints()
 
     # ── State ─────────────────────────────────────────────────────────────────
 
     def _reload(self) -> None:
         self.state = self.store.load()
         tree = self.query_one(NavTree)
-        tree.populate(self.state, self.root)
+        tree.populate(self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters)
         if self.selected:
             tree.focus_nav(self.selected)
             self._show_view()
@@ -107,32 +122,37 @@ class CoopOSApp(App[None]):
         content = self.query_one(ContentPanel)
         editing = content.is_editing
 
-        new_kind: str | None = None
+        pairs: list[tuple[str, str]] = []
         if not editing and nav is not None:
+            new_kind: str | None = None
             if nav.kind == "section" and nav.section in _SECTION_TO_KIND:
                 new_kind = _SECTION_TO_KIND[nav.section]
             elif nav.kind in ("role", "milestone", "task", "note", "skill"):
                 new_kind = nav.kind
+            if new_kind:
+                pairs.append(("n", f"new {new_kind}"))
+            if nav.kind == "task":
+                pairs.append(("^n", "new subtask"))
+            deletable = {"role", "milestone", "task", "note", "doc", "skill"}
+            if nav.kind in deletable:
+                pairs.append(("d", "delete"))
 
-        show_new = new_kind is not None
-        show_subtask = not editing and nav is not None and nav.kind == "task"
-        deletable = {"role", "milestone", "task", "note", "doc", "skill"}
-        show_delete = not editing and nav is not None and nav.kind in deletable
+        self.query_one(SplitFooter).update_left(pairs)
 
-        hint_updates: list[tuple[str, str, bool, str | None]] = [
-            ("n", "new_item", show_new, f"new {new_kind}" if new_kind else None),
-            ("ctrl+n", "new_subtask", show_subtask, None),
-            ("d", "delete_item", show_delete, None),
-        ]
-        for key, action, show, desc in hint_updates:
-            bindings = self._bindings.key_to_bindings.get(key, [])
-            for i, b in enumerate(bindings):
-                if b.action == action:
-                    if desc is not None:
-                        bindings[i] = replace(b, show=show, description=desc)
-                    else:
-                        bindings[i] = replace(b, show=show)
-        self.screen.refresh_bindings()
+    def _update_right_hints(self) -> None:
+        active = {
+            k for k, f in [
+                ("r", self.role_filters),
+                ("m", self.milestone_filters),
+                ("t", self.task_filters),
+            ]
+            if f
+        }
+        self.query_one(SplitFooter).update_right(
+            "Filters",
+            [("r", "role"), ("m", "milestone"), ("t", "task")],
+            active,
+        )
 
     # ── Tree navigation ───────────────────────────────────────────────────────
 
@@ -180,14 +200,14 @@ class CoopOSApp(App[None]):
         self._save_current()
         tree = self.query_one(NavTree)
         assert self.state is not None
-        tree.populate(self.state, self.root)
+        tree.populate(self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters)
 
     @on(SelectInput.ValueSelected)
     def on_select_value_selected(self) -> None:
         self._save_current()
         tree = self.query_one(NavTree)
         assert self.state is not None
-        tree.populate(self.state, self.root)
+        tree.populate(self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters)
 
     def _exit_edit_mode(self) -> None:
         self._save_current()
@@ -199,7 +219,7 @@ class CoopOSApp(App[None]):
         self._update_footer_hints(self.selected)
         tree = self.query_one(NavTree)
         assert self.state is not None
-        tree.populate(self.state, self.root)
+        tree.populate(self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters)
         tree.focus()
         if self.selected:
             tree.focus_nav(self.selected)
@@ -330,7 +350,7 @@ class CoopOSApp(App[None]):
 
         self.state = self.store.load()
         tree = self.query_one(NavTree)
-        tree.populate(self.state, self.root)
+        tree.populate(self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters)
         self.selected = Nav(kind, new_item.id, section)
         tree.focus_nav(self.selected)
         self._show_edit(select_all=True)
@@ -351,7 +371,7 @@ class CoopOSApp(App[None]):
         self.store.tasks.save(new_item)
         self.state = self.store.load()
         tree = self.query_one(NavTree)
-        tree.populate(self.state, self.root)
+        tree.populate(self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters)
         self.selected = Nav("task", new_item.id, "tasks")
         tree.focus_nav(self.selected)
         self._show_edit(select_all=True)
@@ -422,6 +442,47 @@ class CoopOSApp(App[None]):
                 self.query_one(NavTree).focus_nav(next_nav)
                 if next_nav.kind != "section":
                     self._show_view()
+
+    # ── Filter ────────────────────────────────────────────────────────────────
+
+    @work
+    async def action_filter_roles(self) -> None:
+        content = self.query_one(ContentPanel)
+        if content.is_editing:
+            return
+        from coop_os.backend.models import RoleStatus
+        options = [(s.value, s.value.replace("_", " ").title()) for s in RoleStatus]
+        result = await self.push_screen_wait(FilterScreen("Filter Roles", options, self.role_filters))
+        if result is not None:
+            self.role_filters = result
+            self._reload()
+            self._update_right_hints()
+
+    @work
+    async def action_filter_milestones(self) -> None:
+        content = self.query_one(ContentPanel)
+        if content.is_editing:
+            return
+        from coop_os.backend.models import MilestoneStatus
+        options = [(s.value, s.value.replace("_", " ").title()) for s in MilestoneStatus]
+        result = await self.push_screen_wait(FilterScreen("Filter Milestones", options, self.milestone_filters))
+        if result is not None:
+            self.milestone_filters = result
+            self._reload()
+            self._update_right_hints()
+
+    @work
+    async def action_filter_tasks(self) -> None:
+        content = self.query_one(ContentPanel)
+        if content.is_editing:
+            return
+        from coop_os.backend.models import TaskStatus
+        options = [(s.value, s.value.replace("_", " ").title()) for s in TaskStatus]
+        result = await self.push_screen_wait(FilterScreen("Filter Tasks", options, self.task_filters))
+        if result is not None:
+            self.task_filters = result
+            self._reload()
+            self._update_right_hints()
 
     # ── Misc ──────────────────────────────────────────────────────────────────
 

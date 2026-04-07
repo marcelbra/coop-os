@@ -16,6 +16,7 @@ from coop_os.tui.widgets.field_input import FieldInput
 from coop_os.tui.widgets.header import FixedHeader
 from coop_os.tui.widgets.nav_tree import NavTree
 from coop_os.tui.widgets.select_input import SelectInput
+from coop_os.tui.widgets.split_footer import SplitFooter
 from coop_os.tui.widgets.structured_editor import StructuredEditor
 from coop_os.tui.widgets.text_area import DetailTextArea
 
@@ -33,6 +34,7 @@ __all__ = [
     "FixedHeader",
     "NavTree",
     "SELECT_FIELDS",
+    "SplitFooter",
     "SelectInput",
     "StructuredEditor",
     "read_config",
