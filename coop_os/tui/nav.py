@@ -13,6 +13,6 @@ def truncate_label(s: str) -> str:
 
 @dataclass
 class Nav:
-    kind: str  # milestone | task | note | section | agent | skill
+    kind: str  # milestone | task | note | section | agent | skill | group | separator
     id: str
     section: str  # milestones | tasks | notes | skills | ""
