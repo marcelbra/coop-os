@@ -109,6 +109,16 @@ class NavTree(Tree[Nav | None]):
         self.move_cursor(node.parent)
         event.stop()
 
+    # ── Navigation contract ───────────────────────────────────────────────
+    # Up   : move to the previous *sibling* (skip non-interactive ones), then
+    #        to parent if there is no sibling above.  Never dives into the
+    #        children of a previous sibling — always lands on section headers.
+    # Down : if the current node is expanded and has children, descend into
+    #        the first child.  Otherwise find the next interactive sibling.
+    #        If no sibling follows, climb to the parent and repeat (so the
+    #        last child of a section falls through to the next section).
+    # ─────────────────────────────────────────────────────────────────────
+
     def _handle_up(self, event: Key) -> None:
         node = self.cursor_node
         if not node or not node.parent:
@@ -124,7 +134,7 @@ class NavTree(Tree[Nav | None]):
                 event.stop()
                 return
             candidate_idx -= 1
-        # No interactive sibling above — collapse to parent unless already at root level.
+        # No interactive sibling above — go to parent (unless already at root level).
         if node.parent is not self.root:
             self.move_cursor(node.parent)
         event.stop()
@@ -134,19 +144,26 @@ class NavTree(Tree[Nav | None]):
         if not node:
             event.stop()
             return
-        # When on root, scan its children for the first interactive node.
-        children_to_scan: list[TreeNode[Nav | None]]
-        if node.parent is None:
-            children_to_scan = list(node.children)
-        else:
-            siblings = list(node.parent.children)
-            idx = siblings.index(node)
-            children_to_scan = siblings[idx + 1:]
-        for candidate in children_to_scan:
-            if self._is_interactive(candidate):
-                self.move_cursor(candidate)
-                event.stop()
-                return
+        # Descend into children when the node is expanded.
+        if node.is_expanded and node.children:
+            self.move_cursor(list(node.children)[0])
+            event.stop()
+            return
+        # No children to enter — find next interactive sibling, climbing when needed.
+        current = node
+        while current is not self.root:
+            parent = current.parent
+            if parent is None:
+                break
+            siblings = list(parent.children)
+            idx = siblings.index(current)
+            for candidate in siblings[idx + 1:]:
+                if self._is_interactive(candidate):
+                    self.move_cursor(candidate)
+                    event.stop()
+                    return
+            # Exhausted siblings at this level; climb and try the parent's siblings.
+            current = parent
         event.stop()
 
     def _handle_enter(self, event: Key) -> None:
@@ -154,12 +171,17 @@ class NavTree(Tree[Nav | None]):
         if not node:
             return
         nav = node.data
-        if isinstance(nav, Nav) and nav.kind in ("group", "separator"):
+        if not isinstance(nav, Nav) or nav.kind in ("group", "separator"):
             event.stop()
             return
-        if not (isinstance(nav, Nav) and nav.kind != "section"):
-            node.toggle()
-            event.stop()
+        if node.children:
+            if node.is_expanded:
+                node.collapse()
+            else:
+                node.expand()
+                first = list(node.children)[0]
+                self.app.call_after_refresh(lambda n=first: self.move_cursor(n))
+        event.stop()
 
     # ── Data methods ──────────────────────────────────────────────────────
 
