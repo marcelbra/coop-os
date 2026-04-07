@@ -45,7 +45,7 @@ class CoopOSApp(App[None]):
         self.root = root
         self.store = ProjectStore(root)
         self.state: ProjectState | None = None
-        self.selected: Nav | None = Nav("section", "", "docs")
+        self.selected: Nav | None = Nav("section", "", "roles")
 
     # ── Layout ────────────────────────────────────────────────────────────────
 

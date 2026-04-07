@@ -124,8 +124,9 @@ class NavTree(Tree[Nav | None]):
                 event.stop()
                 return
             candidate_idx -= 1
-        # No interactive sibling above — move to parent (including root).
-        self.move_cursor(node.parent)
+        # No interactive sibling above — collapse to parent unless already at root level.
+        if node.parent is not self.root:
+            self.move_cursor(node.parent)
         event.stop()
 
     def _handle_down(self, event: Key) -> None:
