@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="banner.png" alt="coop-os" width="100%">
-</p>
-
 <h3 align="center">coop-os</h3>
 
 ---
