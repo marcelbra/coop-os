@@ -1,19 +1,24 @@
 ![coop-os banner](banner.png)
 
+[![PyPI version](https://img.shields.io/pypi/v/coop-os)](https://pypi.org/project/coop-os/)
+[![Python](https://img.shields.io/pypi/pyversions/coop-os)](https://pypi.org/project/coop-os/)
+[![License](https://img.shields.io/github/license/marcelbra/coop-os)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/marcelbra/coop-os/lint.yml?label=CI)](https://github.com/marcelbra/coop-os/actions)
+
 A lightweight context layer for human-AI co-working. Plain markdown files your agent can read and edit directly — a keyboard-driven TUI so you can navigate and update everything yourself.
 
 ## What it is
 
 coop-os is built around one idea: **your agent needs context, and you need visibility into what it's doing.**
 
-Everything lives in `coop_os/content/` as plain markdown files with YAML frontmatter. No database, no sync service, no lock-in. Your agent reads and writes files directly. You use the TUI to review, edit, and stay in sync.
+Everything lives in `coop_os/context/` as plain markdown files with YAML frontmatter. No database, no sync service, no lock-in. Your agent reads and writes files directly. You use the TUI to review, edit, and stay in sync.
 
 The workflow is simple: you and your agent work through milestones and tasks together. The agent reads your current state, picks up where things left off, and works directly inside task directories. You check in via the TUI or by running a skill like `/check-in` or `/weekly-review`.
 
 ## Content layer
 
 ```
-coop_os/content/
+coop_os/context/
 ├── AGENT.md              # How your agent should operate — instructions, preferences, context
 ├── milestones/           # Long-horizon goals, each a markdown file
 ├── tasks/                # Actionable items — each task is a directory the agent works in
