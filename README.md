@@ -2,7 +2,7 @@
   <img src="banner.png" alt="coop-os" width="100%">
 </p>
 
-<h1 align="center">coop-os</h1>
+<h3 align="center">coop-os</h3>
 
 ---
 
