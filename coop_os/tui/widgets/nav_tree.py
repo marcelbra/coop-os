@@ -169,6 +169,35 @@ class NavTree(Tree[Nav | None]):
             line = "─" * 22
             self.root.add_leaf(Text(line, style="#30363d"), data=Nav("separator", "", ""))
 
+        # ── Workspaces group ──────────────────────────────────────
+        _add_group_header("Workspaces")
+        _add_separator()
+        roles = self.root.add(
+            "⌄  Roles",
+            data=Nav("section", "", "roles"),
+            expand="roles" in expanded,
+        )
+        for r in state.roles:
+            roles.add_leaf(
+                truncate_label(f"{cfg.role_statuses.get(r.status, '•')} {r.title}"),
+                data=Nav("role", r.id, "roles"),
+            )
+        ms = self.root.add(
+            "⌄  Milestones",
+            data=Nav("section", "", "milestones"),
+            expand="milestones" in expanded,
+        )
+        for m in state.milestones:
+            ms.add_leaf(
+                truncate_label(f"{cfg.milestone_statuses.get(m.status, '•')} {m.title}"),
+                data=Nav("milestone", m.id, "milestones"),
+            )
+        tasks_node = self.root.add(
+            "⌄  Tasks", data=Nav("section", "", "tasks"), expand="tasks" in expanded
+        )
+        self._add_task_nodes(tasks_node, state.tasks, None, cfg, expanded_tasks)
+        _add_separator()
+
         # ── User group ────────────────────────────────────────────
         _add_group_header("User")
         _add_separator()
@@ -198,35 +227,6 @@ class NavTree(Tree[Nav | None]):
             )
             for s in state.skills:
                 skills.add_leaf(truncate_label(s.command), data=Nav("skill", s.id, "skills"))
-        _add_separator()
-
-        # ── To dos group ──────────────────────────────────────────
-        _add_group_header("To dos")
-        _add_separator()
-        roles = self.root.add(
-            "⌄  Roles",
-            data=Nav("section", "", "roles"),
-            expand="roles" in expanded,
-        )
-        for r in state.roles:
-            roles.add_leaf(
-                truncate_label(f"{cfg.role_statuses.get(r.status, '•')} {r.title}"),
-                data=Nav("role", r.id, "roles"),
-            )
-        ms = self.root.add(
-            "⌄  Milestones",
-            data=Nav("section", "", "milestones"),
-            expand="milestones" in expanded,
-        )
-        for m in state.milestones:
-            ms.add_leaf(
-                truncate_label(f"{cfg.milestone_statuses.get(m.status, '•')} {m.title}"),
-                data=Nav("milestone", m.id, "milestones"),
-            )
-        tasks_node = self.root.add(
-            "⌄  Tasks", data=Nav("section", "", "tasks"), expand="tasks" in expanded
-        )
-        self._add_task_nodes(tasks_node, state.tasks, None, cfg, expanded_tasks)
         _add_separator()
 
     def focus_nav(self, nav: Nav) -> None:
