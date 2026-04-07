@@ -17,9 +17,8 @@ Thumbs.db
 .idea/
 .claude/
 
-# Personal data (coop_os/context/ — only templates tracked)
+# Personal data (coop_os/context/ — not tracked)
 coop_os/context/roles/*
 coop_os/context/milestones/*
 coop_os/context/notes/*
 coop_os/context/tasks/*
-!coop_os/context/tasks/template.md
