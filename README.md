@@ -11,7 +11,7 @@
 
 ---
 
-`coop-os` is a lightweight context layer for agent-human co-working. Unlike classic note taking apps and todo lists `coop-os` all around simple text files that any agent harness can edit. Humans can navigate and edit in a lightweight terminal-only UI.
+**coop-os** is a lightweight context layer for agent-human co-working. Unlike classic note taking apps and todo lists `coop-os` all around simple text files that any agent harness can edit. Humans can navigate and edit in a lightweight terminal-only UI.
 
 three core concepts:
 - the workspace - as tree with an opinionated naming as `roles` -> `milestones` -> `tasks`
