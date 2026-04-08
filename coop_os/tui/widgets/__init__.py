@@ -2,14 +2,7 @@ from __future__ import annotations
 
 from coop_os.tui.widgets.body_text_area import BodyTextArea
 from coop_os.tui.widgets.calendar import CalendarWidget
-from coop_os.tui.widgets.config import (
-    BODY_ATTR,
-    DATE_FIELDS,
-    FIELD_DEFS,
-    SELECT_FIELDS,
-    AppConfig,
-    read_config,
-)
+from coop_os.tui.widgets.config import AppConfig, read_config
 from coop_os.tui.widgets.content_panel import ContentPanel
 from coop_os.tui.widgets.date_field_input import DateFieldInput
 from coop_os.tui.widgets.field_input import FieldInput
@@ -22,18 +15,14 @@ from coop_os.tui.widgets.text_area import DetailTextArea
 
 __all__ = [
     "AppConfig",
-    "BODY_ATTR",
     "BodyTextArea",
     "CalendarWidget",
     "ContentPanel",
-    "DATE_FIELDS",
     "DateFieldInput",
     "DetailTextArea",
-    "FIELD_DEFS",
     "FieldInput",
     "FixedHeader",
     "NavTree",
-    "SELECT_FIELDS",
     "SplitFooter",
     "SelectInput",
     "StructuredEditor",

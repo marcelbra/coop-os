@@ -11,17 +11,10 @@ from textual.widget import Widget
 from textual.widgets import Label, Rule
 
 from coop_os.backend.models import ProjectState
+from coop_os.backend.schema import BODY_ATTR, DATE_FIELDS, FIELD_DEFS, SELECT_FIELDS
 from coop_os.tui.widgets.body_text_area import BodyTextArea
 from coop_os.tui.widgets.calendar import CalendarWidget
-from coop_os.tui.widgets.config import (
-    BODY_ATTR,
-    DATE_FIELDS,
-    FIELD_DEFS,
-    SCANNED_ICONS,
-    SELECT_FIELDS,
-    AppConfig,
-    read_config,
-)
+from coop_os.tui.widgets.config import SCANNED_ICONS, AppConfig, read_config
 from coop_os.tui.widgets.date_field_input import DateFieldInput
 from coop_os.tui.widgets.field_input import FieldInput
 from coop_os.tui.widgets.select_input import SelectInput
