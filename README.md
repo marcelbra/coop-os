@@ -11,22 +11,26 @@
 
 ---
 
-**coop-os** is a lightweight context layer for agent-human co-working. Unlike classic note taking apps and todo lists `coop-os` all around simple text files that any agent harness can edit. Humans can navigate and edit in a lightweight terminal-only UI.
+**coop-os** is a lightweight context layer for agent-human co-working. Unlike classic note taking apps and todo lists `coop-os` works around simple text files that any agent harness can edit. Humans can navigate and edit in a lightweight terminal-only UI.
 
-three core concepts:
+The app comes with
+
+... three core concepts
 - the workspace - as tree with an opinionated naming as `roles` -> `milestones` -> `tasks`
-- agent agent as primary worker - augmented by skills and workflows
-- user - user information and personal notetaking
+- an agent space as primary worker definitions - augmented by skills and workflows
+- user space for context - user information and personal notetaking
 
-features:
+... the following features
 - note taking on steroids
-- agent-driven design
-- seamless and smooth TUI
+- agent-first design
+- seamless and smooth TUI for humans
 
-coming up:
+And will soon be extended to
 - Skills 2.0 - improved workflow integration incl. mcp server
 - Examples and tutorials
 - An agent-driven CLI mostly for control and performance - for now agent harnesses file editing should work
+
+Collaboration welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Install
 
@@ -51,7 +55,7 @@ Requires Python 3.13+. Subject to downgrade.
 
 ## Collaboration
 
-Improved PR and release convention and how to collaborate coming soon.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branching model, PR workflow, and release process.
 
 
 ## Notes
