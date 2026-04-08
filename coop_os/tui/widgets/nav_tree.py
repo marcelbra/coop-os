@@ -94,12 +94,15 @@ class NavTree(Tree[Nav | None]):
                 self.post_message(NavTree.EditRequested(nav))
         else:
             # Section node: expand and navigate to first child.
+            # Do nothing if the section is empty — don't rotate the triangle.
             children = list(node.children)
+            if not children:
+                event.stop()
+                return
             if not node.is_expanded:
                 node.expand()
-            if children:
-                target = children[0]
-                self.app.call_after_refresh(lambda n=target: self.move_cursor(n))
+            target = children[0]
+            self.app.call_after_refresh(lambda n=target: self.move_cursor(n))
         event.stop()
 
     def _handle_left(self, event: Key) -> None:
@@ -217,37 +220,40 @@ class NavTree(Tree[Nav | None]):
         milestone_filters: set[str],
         task_filters: set[str],
     ) -> None:
-        roles_arrow = "▼" if "roles" in expanded else "▶"
+        visible_roles = [r for r in state.roles if not role_filters or r.status in role_filters]
+        roles_expand = "roles" in expanded and bool(visible_roles)
         roles_node = self.root.add(
-            self._section_label(roles_arrow, "Roles", bool(role_filters)),
+            self._section_label("▼" if roles_expand else "▶", "Roles", bool(role_filters)),
             data=Nav("section", "", "roles"),
-            expand="roles" in expanded,
+            expand=roles_expand,
         )
-        for r in state.roles:
-            if role_filters and r.status not in role_filters:
-                continue
+        for r in visible_roles:
             roles_node.add_leaf(
                 truncate_label(f"{cfg.role_statuses.get(r.status, '•')} {r.title}"),
                 data=Nav("role", r.id, "roles"),
             )
-        ms_arrow = "▼" if "milestones" in expanded else "▶"
+
+        visible_milestones = [m for m in state.milestones if not milestone_filters or m.status in milestone_filters]
+        ms_expand = "milestones" in expanded and bool(visible_milestones)
         ms_node = self.root.add(
-            self._section_label(ms_arrow, "Milestones", bool(milestone_filters)),
+            self._section_label("▼" if ms_expand else "▶", "Milestones", bool(milestone_filters)),
             data=Nav("section", "", "milestones"),
-            expand="milestones" in expanded,
+            expand=ms_expand,
         )
-        for m in state.milestones:
-            if milestone_filters and m.status not in milestone_filters:
-                continue
+        for m in visible_milestones:
             ms_node.add_leaf(
                 truncate_label(f"{cfg.milestone_statuses.get(m.status, '•')} {m.title}"),
                 data=Nav("milestone", m.id, "milestones"),
             )
-        tasks_arrow = "▼" if "tasks" in expanded else "▶"
+
+        has_visible_tasks = any(
+            t for t in state.tasks if t.parent is None and (not task_filters or t.status in task_filters)
+        )
+        tasks_expand = "tasks" in expanded and has_visible_tasks
         tasks_node = self.root.add(
-            self._section_label(tasks_arrow, "Tasks", bool(task_filters)),
+            self._section_label("▼" if tasks_expand else "▶", "Tasks", bool(task_filters)),
             data=Nav("section", "", "tasks"),
-            expand="tasks" in expanded,
+            expand=tasks_expand,
         )
         self._add_task_nodes(tasks_node, state.tasks, None, cfg, expanded_tasks, task_filters)
 
