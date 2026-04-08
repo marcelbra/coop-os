@@ -9,7 +9,7 @@ from typing import Any, Protocol
 import frontmatter
 
 from coop_os.backend.models import (
-    Doc,
+    Context,
     Milestone,
     Note,
     ParseError,
@@ -168,7 +168,7 @@ class FlatFileStore[T: _HasId](ABC):
 
 class RoleStore(FlatFileStore[Role]):
     def __init__(self, root: Path) -> None:
-        super().__init__(root, "work/roles", "role")
+        super().__init__(root, "workspace/roles", "role")
 
     def _parse(self, meta: dict[str, Any], content: str) -> Role:
         return Role(
@@ -191,7 +191,7 @@ class RoleStore(FlatFileStore[Role]):
 
 class MilestoneStore(FlatFileStore[Milestone]):
     def __init__(self, root: Path) -> None:
-        super().__init__(root, "work/milestones", "milestone")
+        super().__init__(root, "workspace/milestones", "milestone")
 
     def _parse(self, meta: dict[str, Any], content: str) -> Milestone:
         return Milestone(
@@ -223,7 +223,7 @@ class MilestoneStore(FlatFileStore[Milestone]):
 class TaskStore:
     def __init__(self, root: Path) -> None:
         self.root = root
-        self._dir = root / "coop_os" / "work" / "tasks"
+        self._dir = root / "coop_os" / "workspace" / "tasks"
 
     def _load_from_dir(
         self, search_dir: Path, parent_id: str | None, tasks: list[Task], errors: list[ParseError]
@@ -325,21 +325,21 @@ class NoteStore(FlatFileStore[Note]):
         return item.title
 
 
-class DocStore(FlatFileStore[Doc]):
+class ContextStore(FlatFileStore[Context]):
     def __init__(self, root: Path) -> None:
-        super().__init__(root, "user/context", "doc")
+        super().__init__(root, "user/context", "context")
 
-    def _parse(self, meta: dict[str, Any], content: str) -> Doc:
-        return Doc(
+    def _parse(self, meta: dict[str, Any], content: str) -> Context:
+        return Context(
             id=str(meta["id"]),
             title=str(meta["title"]),
             content=content,
         )
 
-    def _to_meta_content(self, item: Doc) -> tuple[dict[str, Any], str]:
+    def _to_meta_content(self, item: Context) -> tuple[dict[str, Any], str]:
         return {"id": item.id, "title": item.title}, item.content
 
-    def _file_slug(self, item: Doc) -> str:
+    def _file_slug(self, item: Context) -> str:
         return item.title
 
 
@@ -371,7 +371,7 @@ class ProjectStore:
         self.milestones = MilestoneStore(root)
         self.tasks = TaskStore(root)
         self.notes = NoteStore(root)
-        self.docs = DocStore(root)
+        self.contexts = ContextStore(root)
         self.skills = SkillStore(root)
 
     def load(self) -> ProjectState:
@@ -379,15 +379,15 @@ class ProjectStore:
         milestones, ms_errs = self.milestones.load_all()
         tasks, task_errs = self.tasks.load_all()
         notes, note_errs = self.notes.load_all()
-        docs, doc_errs = self.docs.load_all()
+        contexts, ctx_errs = self.contexts.load_all()
         skills, skill_errs = self.skills.load_all()
-        errors = role_errs + ms_errs + task_errs + note_errs + doc_errs + skill_errs
+        errors = role_errs + ms_errs + task_errs + note_errs + ctx_errs + skill_errs
         return ProjectState(
             roles=roles,
             milestones=milestones,
             tasks=tasks,
             notes=notes,
-            docs=docs,
+            contexts=contexts,
             skills=skills,
             errors=errors,
         )
@@ -402,8 +402,8 @@ class ProjectStore:
                 return self.tasks.find_path(item_id)
             case "note":
                 return self.notes.find_path(item_id)
-            case "doc":
-                return self.docs.find_path(item_id)
+            case "context":
+                return self.contexts.find_path(item_id)
             case "skill":
                 return self.skills.find_path(item_id)
             case _:

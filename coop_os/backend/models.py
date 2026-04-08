@@ -60,7 +60,7 @@ class Note(BaseModel):
     content: str = ""
 
 
-class Doc(BaseModel):
+class Context(BaseModel):
     id: str
     title: str
     content: str = ""
@@ -82,6 +82,6 @@ class ProjectState(BaseModel):
     milestones: list[Milestone] = []
     tasks: list[Task] = []
     notes: list[Note] = []
-    docs: list[Doc] = []
+    contexts: list[Context] = []
     skills: list[Skill] = []
     errors: list[ParseError] = []

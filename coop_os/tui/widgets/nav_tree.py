@@ -72,14 +72,14 @@ class NavTree(Tree[Nav | None]):
     # ── Key handlers ──────────────────────────────────────────────────────
 
     def _is_interactive(self, node: TreeNode[Nav | None]) -> bool:
-        return isinstance(node.data, Nav) and node.data.kind not in ("group", "separator")
+        return isinstance(node.data, Nav)
 
     def _handle_right(self, event: Key) -> None:
         node = self.cursor_node
         if not node:
             return
         nav = node.data
-        if not isinstance(nav, Nav) or nav.kind in ("group", "separator"):
+        if not isinstance(nav, Nav):
             event.stop()
             return
         if nav.kind != "section":
@@ -174,7 +174,7 @@ class NavTree(Tree[Nav | None]):
         if not node:
             return
         nav = node.data
-        if not isinstance(nav, Nav) or nav.kind in ("group", "separator"):
+        if not isinstance(nav, Nav):
             event.stop()
             return
         if node.children:
@@ -280,10 +280,10 @@ class NavTree(Tree[Nav | None]):
         cfg = read_config(root)
 
         def _header(label: str) -> None:
-            self.root.add_leaf(Text(label, style="#7a9eb8"), data=Nav("group", "", ""))
+            self.root.add_leaf(Text(label, style="#7a9eb8"), data=None)
 
         def _sep() -> None:
-            self.root.add_leaf(Text("─" * 22, style="#30363d"), data=Nav("separator", "", ""))
+            self.root.add_leaf(Text("─" * 22, style="#30363d"), data=None)
 
         # ── Workspaces group ──────────────────────────────────────
         _header("Workspaces")
@@ -295,10 +295,10 @@ class NavTree(Tree[Nav | None]):
         _header("User")
         _sep()
         docs = self.root.add(
-            "○  Context", data=Nav("section", "", "docs"), expand="docs" in expanded
+            "○  Context", data=Nav("section", "", "contexts"), expand="contexts" in expanded
         )
-        for d in state.docs:
-            docs.add_leaf(truncate_label(f"• {d.title}"), data=Nav("doc", d.id, "docs"))
+        for d in state.contexts:
+            docs.add_leaf(truncate_label(f"• {d.title}"), data=Nav("context", d.id, "contexts"))
         notes = self.root.add(
             "○  Notes", data=Nav("section", "", "notes"), expand="notes" in expanded
         )

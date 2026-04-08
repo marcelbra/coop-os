@@ -17,13 +17,12 @@ You operate on the coop-os file system. Read and write files according to the st
 
 | Path | Contents |
 |------|----------|
-| `context/pms.md` | Personal mission statement |
-| `context/roles/` | One file per life role |
-| `milestones/` | Active and completed milestones |
-| `tasks/` | Task folders — `{id}-{slug}/description.md` each |
-| `notes/` | Raw notes pending review |
-| `templates/` | Templates for creating new items |
-| `skills/` | Skill definitions — what this agent can do |
+| `coop_os/workspace/roles/` | One file per life role |
+| `coop_os/workspace/milestones/` | Active and completed milestones |
+| `coop_os/workspace/tasks/` | Task folders — `{id}-{slug}/description.md` each |
+| `coop_os/user/notes/` | Raw notes pending review |
+| `coop_os/user/context/` | Personal context documents |
+| `coop_os/agent/skills/` | Skill definitions — what this agent can do |
 
 ---
 
@@ -42,9 +41,9 @@ You operate on the coop-os file system. Read and write files according to the st
 
 At the start of every session (unless a skill is triggered immediately):
 
-1. Load role files from `context/roles/`
-2. Scan `tasks/` for in-progress and overdue items
-3. Check `milestones/` for anything stalled or due soon
+1. Load role files from `coop_os/workspace/roles/`
+2. Scan `coop_os/workspace/tasks/` for in-progress and overdue items
+3. Check `coop_os/workspace/milestones/` for anything stalled or due soon
 4. Greet the user with a brief status snapshot: what's active, what needs attention
 
 ---
