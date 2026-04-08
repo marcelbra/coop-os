@@ -38,7 +38,10 @@ After merging, switch to develop and pull: `git checkout develop && git pull ori
 
 When `develop` is stable and ready to ship:
 
-1. Bump `version` in `pyproject.toml` on `develop` (commit directly or via a PR)
+1. On `develop`, in a single PR:
+   - Bump `version` in `pyproject.toml`
+   - Run `uv sync` to update `uv.lock`, then commit it alongside `pyproject.toml`
+   - Add a `## [X.Y.Z] - YYYY-MM-DD` entry to `CHANGELOG.md`
 2. Open a release PR from `develop` to `main`:
    ```
    gh pr create --repo marcelbra/coop-os --base main --head develop --title "Release vX.Y.Z"
