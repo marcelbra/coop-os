@@ -1,7 +1,5 @@
 <h3 align="center">coop-os</h3>
 
----
-
 <p align="center">Agent-native operating system for your daily life. Simple but powerful.</p>
 
 <p align="center">
