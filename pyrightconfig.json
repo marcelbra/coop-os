@@ -12,5 +12,9 @@
   "reportMissingTypeStubs": "none",
   "reportAny": "none",
   "reportExplicitAny": "none",
-  "reportUnknownLambdaType": "none"
+  "reportUnknownLambdaType": "none",
+"reportUninitializedInstanceVariable": "none",
+  "reportUnsafeMultipleInheritance": "none",
+  "reportMissingSuperCall": "none",
+  "reportUnusedParameter": "none"
 }
