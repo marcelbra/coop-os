@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from coop_os.backend.models import (
-    Doc,
+    Context,
     Milestone,
     MilestoneStatus,
     Note,
@@ -18,7 +18,7 @@ from coop_os.backend.models import (
     TaskStatus,
 )
 from coop_os.backend.store import (
-    DocStore,
+    ContextStore,
     MilestoneStore,
     NoteStore,
     ProjectStore,
@@ -401,29 +401,29 @@ def test_note_next_id(tmp_path: Path) -> None:
     assert store.next_id() == "note-1"
 
 
-# ── DocStore ──────────────────────────────────────────────────────────────────
+# ── ContextStore ─────────────────────────────────────────────────────────────
 
 
-def test_doc_save_and_load(tmp_path: Path) -> None:
+def test_context_save_and_load(tmp_path: Path) -> None:
     root = make_root(tmp_path)
-    store = DocStore(root)
-    doc = Doc(id="doc-1", title="Architecture", content="# Overview\n\nDetails here.")
-    store.save(doc)
-    docs, errors = store.load_all()
+    store = ContextStore(root)
+    ctx = Context(id="context-1", title="Architecture", content="# Overview\n\nDetails here.")
+    store.save(ctx)
+    contexts, errors = store.load_all()
     assert errors == []
-    assert len(docs) == 1
-    assert docs[0].id == "doc-1"
-    assert docs[0].content == "# Overview\n\nDetails here."
+    assert len(contexts) == 1
+    assert contexts[0].id == "context-1"
+    assert contexts[0].content == "# Overview\n\nDetails here."
 
 
-def test_doc_delete(tmp_path: Path) -> None:
+def test_context_delete(tmp_path: Path) -> None:
     root = make_root(tmp_path)
-    store = DocStore(root)
-    doc = Doc(id="doc-1", title="Temporary")
-    store.save(doc)
-    assert store.delete("doc-1") is True
-    docs, _ = store.load_all()
-    assert docs == []
+    store = ContextStore(root)
+    ctx = Context(id="context-1", title="Temporary")
+    store.save(ctx)
+    assert store.delete("context-1") is True
+    contexts, _ = store.load_all()
+    assert contexts == []
 
 
 # ── SkillStore ────────────────────────────────────────────────────────────────
@@ -471,7 +471,7 @@ def test_project_store_load_empty(tmp_path: Path) -> None:
     assert state.milestones == []
     assert state.tasks == []
     assert state.notes == []
-    assert state.docs == []
+    assert state.contexts == []
     assert state.skills == []
     assert state.errors == []
 
@@ -483,7 +483,7 @@ def test_project_store_load_all_types(tmp_path: Path) -> None:
     ps.milestones.save(Milestone(id="milestone-1", title="v1.0"))
     ps.tasks.save(Task(id="task-1", title="Ship it"))
     ps.notes.save(Note(id="note-1", title="Daily"))
-    ps.docs.save(Doc(id="doc-1", title="Spec"))
+    ps.contexts.save(Context(id="context-1", title="Spec"))
     ps.skills.save(Skill(id="skill-1", command="/check-in"))
 
     state = ps.load()
@@ -491,7 +491,7 @@ def test_project_store_load_all_types(tmp_path: Path) -> None:
     assert len(state.milestones) == 1
     assert len(state.tasks) == 1
     assert len(state.notes) == 1
-    assert len(state.docs) == 1
+    assert len(state.contexts) == 1
     assert len(state.skills) == 1
     assert state.errors == []
 
