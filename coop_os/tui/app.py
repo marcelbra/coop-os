@@ -223,8 +223,11 @@ class CoopOSApp(ActionsMixin, App[None]):
             return
         if self.selected.kind == "agent":
             path = self._item_path()
-            md = path.read_text(encoding="utf-8") if path and path.exists() else ""
-            await content.show_view(md)
+            if not path or not path.exists() or not self.sm.state:
+                return
+            text = path.read_text(encoding="utf-8")
+            agent_doc = SimpleNamespace(content=text)
+            content.show_struct_view(agent_doc, "agent", self.sm.cfg(), self.sm.state)
             self.query_one(NavTree).focus()
         elif self.selected.kind == "task_file":
             path = self._item_path()

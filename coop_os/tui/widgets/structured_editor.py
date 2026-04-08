@@ -123,16 +123,16 @@ class StructuredEditor(Widget):
         ta.read_only = not editable
 
     def focus_first(self, select_all: bool = False) -> None:
-        """Focus the first editable field, falling back to the body."""
+        """Focus the first editable field (new items only) or the body (existing items)."""
         for cal in self.query(CalendarWidget):
             cal.remove()
-        for attr_key, _label, kinds, readonly in FIELD_DEFS:
-            if self._kind in kinds and not readonly:
-                inp = self.query_one(f"#se-inp-{attr_key}", FieldInput)
-                if select_all:
+        if select_all:
+            for attr_key, _label, kinds, readonly in FIELD_DEFS:
+                if self._kind in kinds and not readonly:
+                    inp = self.query_one(f"#se-inp-{attr_key}", FieldInput)
                     inp.select_on_next_focus = True
-                inp.focus()
-                return
+                    inp.focus()
+                    return
         self.query_one("#se-body", BodyTextArea).focus()
 
     def _visible_inputs(self) -> list[Widget]:
