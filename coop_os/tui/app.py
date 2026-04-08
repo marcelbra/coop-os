@@ -13,7 +13,6 @@ from coop_os.backend.models import (
     Context,
     Milestone,
     Note,
-    ProjectState,
     Role,
     Skill,
     Task,
@@ -21,6 +20,7 @@ from coop_os.backend.models import (
 from coop_os.backend.store import ProjectStore
 from coop_os.tui.actions import ActionsMixin
 from coop_os.tui.nav import Nav
+from coop_os.tui.state import StateManager
 from coop_os.tui.styles import CSS as APP_CSS
 from coop_os.tui.widgets import (
     ContentPanel,
@@ -40,7 +40,6 @@ _SECTION_TO_KIND: dict[str, str] = {
     "contexts": "context",
     "skills": "skill",
 }
-_KIND_TO_COLLECTION: dict[str, str] = {v: k for k, v in _SECTION_TO_KIND.items()}
 
 
 class CoopOSApp(ActionsMixin, App[None]):
@@ -61,12 +60,9 @@ class CoopOSApp(ActionsMixin, App[None]):
     def __init__(self, root: Path) -> None:
         super().__init__()
         self.root = root
-        self.store = ProjectStore(root)
-        self.state: ProjectState | None = None
+        store = ProjectStore(root)
+        self.sm = StateManager(store, root)
         self.selected: Nav | None = Nav("section", "", "roles")
-        self.role_filters: set[str] = set()
-        self.milestone_filters: set[str] = set()
-        self.task_filters: set[str] = set()
 
     # ── Layout ────────────────────────────────────────────────────────────────
 
@@ -91,40 +87,30 @@ class CoopOSApp(ActionsMixin, App[None]):
         ensure self.state and the NavTree are consistent. It deliberately does
         not touch focus, view mode, or selection — callers own those concerns.
         """
-        self.state = self.store.load()
+        state = self.sm.load()
         self.query_one(NavTree).populate(
-            self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters
+            state, self.root, self.sm.role_filters, self.sm.milestone_filters, self.sm.task_filters
         )
 
     def _reload(self) -> None:
         self._sync_state()
-        assert self.state is not None
+        assert self.sm.state is not None
         tree = self.query_one(NavTree)
         if self.selected:
             tree.focus_nav(self.selected)
             self._show_view()
-        if self.state.errors:
+        if self.sm.state.errors:
             self.notify(
-                f"{len(self.state.errors)} parse error(s) — check files",
+                f"{len(self.sm.state.errors)} parse error(s) — check files",
                 severity="warning",
                 timeout=4,
             )
 
     def _item(self) -> Role | Milestone | Task | Note | Context | Skill | None:
-        nav = self.selected
-        if not nav or not self.state:
-            return None
-        attr = _KIND_TO_COLLECTION.get(nav.kind)
-        if not attr:
-            return None
-        return next((item for item in getattr(self.state, attr) if item.id == nav.id), None)
+        return self.sm.item(self.selected)
 
     def _item_path(self) -> Path | None:
-        if not self.selected:
-            return None
-        if self.selected.kind == "agent":
-            return self.root / "coop_os" / "agent" / "AGENT.md"
-        return self.store.find_item_path(self.selected.kind, self.selected.id)
+        return self.sm.item_path(self.selected)
 
     def _update_footer_hints(self, nav: Nav | None) -> None:
         content = self.query_one(ContentPanel)
@@ -150,9 +136,9 @@ class CoopOSApp(ActionsMixin, App[None]):
     def _update_right_hints(self) -> None:
         active = {
             k for k, f in [
-                ("r", self.role_filters),
-                ("m", self.milestone_filters),
-                ("t", self.task_filters),
+                ("r", self.sm.role_filters),
+                ("m", self.sm.milestone_filters),
+                ("t", self.sm.task_filters),
             ]
             if f
         }
@@ -239,9 +225,9 @@ class CoopOSApp(ActionsMixin, App[None]):
             await content.show_view(md)
         else:
             item = self._item()
-            if not item:
+            if not item or not self.sm.state:
                 return
-            content.show_struct_view(item, self.selected.kind)
+            content.show_struct_view(item, self.selected.kind, self.sm.cfg(), self.sm.state)
             # Re-focus NavTree: show_struct_view applies -view-struct which makes
             # StructuredEditor visible; its focusable children can steal focus.
             self.query_one(NavTree).focus()
@@ -255,12 +241,14 @@ class CoopOSApp(ActionsMixin, App[None]):
             if not path or not path.exists():
                 return
             agent_doc = SimpleNamespace(content=path.read_text(encoding="utf-8"))
-            content.enter_structured_edit(agent_doc, "agent")
+            if not self.sm.state:
+                return
+            content.enter_structured_edit(agent_doc, "agent", self.sm.cfg(), self.sm.state)
         else:
             item = self._item()
-            if not item:
+            if not item or not self.sm.state:
                 return
-            content.enter_structured_edit(item, self.selected.kind, select_all=select_all)
+            content.enter_structured_edit(item, self.selected.kind, self.sm.cfg(), self.sm.state, select_all=select_all)
 
     # ── Auto-save ─────────────────────────────────────────────────────────────
 
