@@ -220,12 +220,12 @@ class CoopOSApp(ActionsMixin, App[None]):
         content = self.query_one(ContentPanel)
         if content.is_editing:
             return
-        if self.selected.kind == "agent":
+        if self.selected.kind in ("agent", "task_file"):
             path = self._item_path()
             md = path.read_text(encoding="utf-8") if path and path.exists() else ""
             await content.show_view(md)
             self.query_one(NavTree).focus()
-        elif self.selected.kind in ("task_file", "task_dir"):
+        elif self.selected.kind == "task_dir":
             await content.show_view("_Cannot be rendered yet :)_")
             self.query_one(NavTree).focus()
         else:
@@ -249,6 +249,11 @@ class CoopOSApp(ActionsMixin, App[None]):
             if not self.sm.state:
                 return
             content.enter_structured_edit(agent_doc, "agent", self.sm.cfg(), self.sm.state)
+        elif self.selected.kind == "task_file":
+            path = self._item_path()
+            if not path or not path.exists():
+                return
+            content.enter_edit(path.read_text(encoding="utf-8"))
         else:
             item = self._item()
             if not item or not self.sm.state:

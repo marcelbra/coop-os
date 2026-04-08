@@ -4,6 +4,37 @@ from pathlib import Path
 
 SCANNED_ICONS: dict[str, str] = {"true": "✓", "false": "!"}
 
+FILE_ICONS: dict[str, str] = {
+    # Python
+    ".py": "λ", ".ipynb": "λ",
+    # JavaScript / TypeScript
+    ".js": "◎", ".jsx": "◎", ".ts": "◎", ".tsx": "◎",
+    # Shell
+    ".sh": "$", ".bash": "$", ".zsh": "$", ".fish": "$",
+    # Markup / docs
+    ".md": "¶", ".rst": "¶",
+    ".html": "◁", ".htm": "◁",
+    ".xml": "◁",
+    # Styles
+    ".css": "≋", ".scss": "≋", ".sass": "≋",
+    # Structured data
+    ".json": "⊞", ".jsonc": "⊞",
+    ".yml": "≈", ".yaml": "≈", ".toml": "≈", ".env": "≈", ".ini": "≈", ".cfg": "≈",
+    # Tabular
+    ".csv": "⊟", ".tsv": "⊟",
+    # Database
+    ".sql": "▦",
+    # Plain text / logs
+    ".txt": "≡", ".log": "≡",
+    # Documents
+    ".pdf": "▤",
+    # Images
+    ".png": "▣", ".jpg": "▣", ".jpeg": "▣", ".gif": "▣",
+    ".svg": "▣", ".webp": "▣", ".ico": "▣",
+}
+FILE_ICON_DEFAULT = "·"
+DIR_ICON = "▸"
+
 
 class AppConfig:
     def __init__(

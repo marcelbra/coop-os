@@ -61,4 +61,6 @@ class StateManager:
             return None
         if nav.kind == "agent":
             return self.root / "coop_os" / "agent" / "AGENT.md"
+        if nav.kind == "task_file":
+            return Path(nav.id)
         return self.store.find_item_path(nav.kind, nav.id)

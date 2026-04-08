@@ -11,9 +11,13 @@ from textual.widgets._tree import TreeNode
 
 from coop_os.backend.models import ProjectState, Task
 from coop_os.tui.nav import Nav, truncate_label
-from coop_os.tui.widgets.config import SCANNED_ICONS, AppConfig, read_config
+from coop_os.tui.widgets.config import DIR_ICON, FILE_ICON_DEFAULT, FILE_ICONS, SCANNED_ICONS, AppConfig, read_config
 
 _TASK_DIR_PREFIX = re.compile(r"^task-\d+-")
+
+
+def _file_icon(path: Path) -> str:
+    return FILE_ICONS.get(path.suffix.lower(), FILE_ICON_DEFAULT)
 
 
 def _list_task_extras(task_dir: Path) -> list[Path]:
@@ -93,7 +97,7 @@ class NavTree(Tree[Nav | None]):
         if not isinstance(nav, Nav):
             event.stop()
             return
-        _EDITABLE_KINDS = {"role", "milestone", "task", "note", "context", "skill", "agent"}
+        _EDITABLE_KINDS = {"role", "milestone", "task", "note", "context", "skill", "agent", "task_file"}
         if nav.kind != "section":
             # Two-step: first → expands a collapsed branch (task with subtasks),
             # moving cursor to first child. Second → opens the editor.
@@ -378,12 +382,17 @@ class NavTree(Tree[Nav | None]):
 
     def _add_path_node(self, parent_node: TreeNode[Nav | None], path: Path, expanded_dirs: set[str]) -> None:
         """Recursively add a filesystem file or directory node under *parent_node*."""
-        icon = "📄" if path.is_file() else "📁"
-        label = truncate_label(f"{icon} {path.name}")
+        icon = _file_icon(path) if path.is_file() else DIR_ICON
+        label = truncate_label(f"{icon}  {path.name}")
         if path.is_dir():
-            node = parent_node.add(label, data=Nav("task_dir", str(path), "tasks"), expand=str(path) in expanded_dirs)
-            for child in sorted(path.iterdir()):
-                self._add_path_node(node, child, expanded_dirs)
+            children = sorted(path.iterdir())
+            if children:
+                expanded = str(path) in expanded_dirs
+                node = parent_node.add(label, data=Nav("task_dir", str(path), "tasks"), expand=expanded)
+                for child in children:
+                    self._add_path_node(node, child, expanded_dirs)
+            else:
+                parent_node.add_leaf(label, data=Nav("task_dir", str(path), "tasks"))
         else:
             parent_node.add_leaf(label, data=Nav("task_file", str(path), "tasks"))
 
