@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-04-08
+
+### Added
+- **Workspaces**: renamed from "To dos", moved to top of nav tree with triangle expand/collapse icons
+- **Filter legend**: split layout with multiselect pop-over in footer
+- **Item IDs**: new items numbered by ID and sorted by creation order
+- **Branching model**: `develop` integration branch, `main` release-only with auto PyPI publish
+- **CONTRIBUTING.md**: contributor guide covering branches, PR workflow, and release process
+
+### Changed
+- Redesigned navigation tree with grouped sections and visual separators
+- Reorganized disk layout to `user/agent/work` structure
+- Unified naming across all layers — `Doc→Context`, `work→workspace`
+- Replaced `Header` subclass with plain widget; moved CSS to `.tcss`
+- Extracted `StateManager` and injected state into `StructuredEditor`
+- Extracted CRUD and filter actions into `ActionsMixin`
+- Moved entity schema constants to `backend/schema.py`
+- Eliminated per-kind dispatch tables in store and app
+- Unified state sync into `_sync_state()`
+
+### Fixed
+- Empty section triangles no longer rotate
+- Navigation tree down/enter key behaviour
+- Cursor now starts on Roles instead of Workspaces header
+
 ## [0.1.0] - 2026-04-07
 
 Initial beta release.
