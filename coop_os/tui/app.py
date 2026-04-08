@@ -31,6 +31,7 @@ from coop_os.tui.widgets import (
     SplitFooter,
     StructuredEditor,
 )
+from coop_os.tui.widgets.config import FILE_LANGUAGES
 
 _SECTION_TO_KIND: dict[str, str] = {
     "roles": "role",
@@ -220,13 +221,26 @@ class CoopOSApp(ActionsMixin, App[None]):
         content = self.query_one(ContentPanel)
         if content.is_editing:
             return
-        if self.selected.kind in ("agent", "task_file"):
+        if self.selected.kind == "agent":
             path = self._item_path()
             md = path.read_text(encoding="utf-8") if path and path.exists() else ""
             await content.show_view(md)
             self.query_one(NavTree).focus()
+        elif self.selected.kind == "task_file":
+            path = self._item_path()
+            if not path or not path.exists() or not self.sm.state:
+                return
+            try:
+                text = path.read_text(encoding="utf-8")
+            except Exception:
+                await content.show_view("_Cannot be rendered yet :)_")
+                self.query_one(NavTree).focus()
+                return
+            file_doc = SimpleNamespace(content=text, language=FILE_LANGUAGES.get(path.suffix.lower(), ""))
+            content.show_struct_view(file_doc, "agent", self.sm.cfg(), self.sm.state)
+            self.query_one(NavTree).focus()
         elif self.selected.kind == "task_dir":
-            await content.show_view("_Cannot be rendered yet :)_")
+            content.clear()
             self.query_one(NavTree).focus()
         else:
             item = self._item()
@@ -251,9 +265,14 @@ class CoopOSApp(ActionsMixin, App[None]):
             content.enter_structured_edit(agent_doc, "agent", self.sm.cfg(), self.sm.state)
         elif self.selected.kind == "task_file":
             path = self._item_path()
-            if not path or not path.exists():
+            if not path or not path.exists() or not self.sm.state:
                 return
-            content.enter_edit(path.read_text(encoding="utf-8"))
+            try:
+                text = path.read_text(encoding="utf-8")
+            except Exception:
+                return
+            file_doc = SimpleNamespace(content=text, language=FILE_LANGUAGES.get(path.suffix.lower(), ""))
+            content.enter_structured_edit(file_doc, "agent", self.sm.cfg(), self.sm.state)
         else:
             item = self._item()
             if not item or not self.sm.state:

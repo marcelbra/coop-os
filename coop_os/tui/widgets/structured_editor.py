@@ -102,6 +102,9 @@ class StructuredEditor(Widget):
         body_attr = BODY_ATTR.get(kind, "content")
         body = getattr(item, body_attr, "") or ""
         ta = self.query_one("#se-body", BodyTextArea)
+        language = getattr(item, "language", None)
+        if language is not None:
+            ta.language = language or None
         ta.load_text(body)
         ta.move_cursor((0, 0))
 

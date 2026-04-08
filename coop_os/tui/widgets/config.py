@@ -35,6 +35,24 @@ FILE_ICONS: dict[str, str] = {
 FILE_ICON_DEFAULT = "·"
 DIR_ICON = "▸"
 
+# Maps file extensions to Textual TextArea language identifiers (tree-sitter).
+FILE_LANGUAGES: dict[str, str] = {
+    ".py": "python", ".ipynb": "python",
+    ".js": "javascript", ".jsx": "javascript",
+    ".ts": "typescript", ".tsx": "typescript",
+    ".sh": "bash", ".bash": "bash", ".zsh": "bash", ".fish": "bash",
+    ".json": "json", ".jsonc": "json",
+    ".yml": "yaml", ".yaml": "yaml",
+    ".toml": "toml",
+    ".html": "html", ".htm": "html",
+    ".css": "css", ".scss": "css", ".sass": "css",
+    ".sql": "sql",
+    ".xml": "xml",
+    ".rs": "rust",
+    ".go": "go",
+    ".md": "markdown", ".markdown": "markdown",
+}
+
 
 class AppConfig:
     def __init__(
