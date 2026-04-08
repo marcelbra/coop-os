@@ -14,7 +14,7 @@ from coop_os.backend.models import ProjectState
 from coop_os.backend.schema import BODY_ATTR, DATE_FIELDS, FIELD_DEFS, SELECT_FIELDS
 from coop_os.tui.widgets.body_text_area import BodyTextArea
 from coop_os.tui.widgets.calendar import CalendarWidget
-from coop_os.tui.widgets.config import SCANNED_ICONS, AppConfig, read_config
+from coop_os.tui.widgets.config import SCANNED_ICONS, AppConfig
 from coop_os.tui.widgets.date_field_input import DateFieldInput
 from coop_os.tui.widgets.field_input import FieldInput
 from coop_os.tui.widgets.select_input import SelectInput
@@ -47,17 +47,14 @@ class StructuredEditor(Widget):
         yield Rule(classes="se-sep", id="se-sep")
         yield BodyTextArea("", id="se-body", language="markdown", theme="vscode_dark")
 
-    def load(self, item: Any, kind: str) -> None:  # noqa: C901
+    def load(self, item: Any, kind: str, cfg: AppConfig, state: ProjectState) -> None:  # noqa: C901
         """Populate fields from *item* and show only the fields relevant to *kind*."""
         for cal in self.query(CalendarWidget):
             cal.remove()
         self._kind = kind
 
-        root = getattr(self.app, "root", None)
-        cfg = read_config(root) if root else AppConfig({}, {}, {})
-        state: ProjectState | None = getattr(self.app, "state", None)
-        role_ids = [r.id for r in state.roles] if state else []
-        milestone_ids = [m.id for m in state.milestones] if state else []
+        role_ids = [r.id for r in state.roles]
+        milestone_ids = [m.id for m in state.milestones]
 
         for attr_key, _label, kinds, _readonly in FIELD_DEFS:
             row = self.query_one(f"#se-row-{attr_key}")

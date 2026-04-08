@@ -25,8 +25,7 @@ if TYPE_CHECKING:
     from textual.app import App
     from textual.worker import Worker
 
-    from coop_os.backend.models import ProjectState
-    from coop_os.backend.store import ProjectStore
+    from coop_os.tui.state import StateManager
 
     _HostBase = App[None]
 else:
@@ -45,12 +44,8 @@ class _CoopOSHost(_HostBase):
     App's own definitions.
     """
 
-    store: ProjectStore
-    state: ProjectState | None
+    sm: StateManager
     selected: Nav | None
-    role_filters: set[str]
-    milestone_filters: set[str]
-    task_filters: set[str]
 
     # CoopOSApp helpers
     def _sync_state(self) -> None: ...
@@ -81,7 +76,7 @@ class ActionsMixin(_CoopOSHost):
 
     def action_new_item(self: _CoopOSHost) -> None:
         content = self.query_one(ContentPanel)
-        if content.is_editing or not self.state:
+        if content.is_editing or not self.sm.state:
             return
         if self.selected and self.selected.kind == "agent":
             return
@@ -99,50 +94,50 @@ class ActionsMixin(_CoopOSHost):
 
         match section:
             case "roles":
-                new_id = self.store.roles.next_id()
+                new_id = self.sm.store.roles.next_id()
                 new_item = Role(id=new_id, title=f"Role {new_id.rsplit('-', 1)[-1]}")
-                self.store.roles.save(new_item)
+                self.sm.store.roles.save(new_item)
                 kind = "role"
             case "milestones":
-                new_id = self.store.milestones.next_id()
+                new_id = self.sm.store.milestones.next_id()
                 new_item = Milestone(
                     id=new_id,
                     title=f"Milestone {new_id.rsplit('-', 1)[-1]}",
                     start_date=today,
                     end_date="",
                 )
-                self.store.milestones.save(new_item)
+                self.sm.store.milestones.save(new_item)
                 kind = "milestone"
             case "tasks":
                 parent: str | None = None
                 if self.selected and self.selected.kind == "task":
-                    current = next((t for t in self.state.tasks if t.id == self.selected.id), None)
+                    current = next((t for t in self.sm.state.tasks if t.id == self.selected.id), None)
                     parent = current.parent if current else None
-                new_id = self.store.tasks.next_id()
+                new_id = self.sm.store.tasks.next_id()
                 new_item = Task(
                     id=new_id,
                     title=f"Task {new_id.rsplit('-', 1)[-1]}",
                     start_date=today,
                     parent=parent,
                 )
-                self.store.tasks.save(new_item)
+                self.sm.store.tasks.save(new_item)
                 kind = "task"
             case "contexts":
-                new_id = self.store.contexts.next_id()
+                new_id = self.sm.store.contexts.next_id()
                 new_item = Context(id=new_id, title=f"Context {new_id.rsplit('-', 1)[-1]}")
-                self.store.contexts.save(new_item)
+                self.sm.store.contexts.save(new_item)
                 kind = "context"
             case "skills":
                 new_item = Skill(
-                    id=self.store.skills.next_id(),
+                    id=self.sm.store.skills.next_id(),
                     command="new-skill",
                 )
-                self.store.skills.save(new_item)
+                self.sm.store.skills.save(new_item)
                 kind = "skill"
             case _:
-                new_id = self.store.notes.next_id()
+                new_id = self.sm.store.notes.next_id()
                 new_item = Note(id=new_id, title=f"Note {new_id.rsplit('-', 1)[-1]}", date=today)
-                self.store.notes.save(new_item)
+                self.sm.store.notes.save(new_item)
                 kind = "note"
 
         self._sync_state()
@@ -152,19 +147,19 @@ class ActionsMixin(_CoopOSHost):
 
     def action_new_subtask(self: _CoopOSHost) -> None:
         content = self.query_one(ContentPanel)
-        if content.is_editing or not self.state:
+        if content.is_editing or not self.sm.state:
             return
         if not self.selected or self.selected.kind != "task":
             return
         today = date.today().isoformat()
-        new_id = self.store.tasks.next_id()
+        new_id = self.sm.store.tasks.next_id()
         new_item = Task(
             id=new_id,
             title=f"Task {new_id.rsplit('-', 1)[-1]}",
             start_date=today,
             parent=self.selected.id,
         )
-        self.store.tasks.save(new_item)
+        self.sm.store.tasks.save(new_item)
         self._sync_state()
         self.selected = Nav("task", new_item.id, "tasks")
         self.query_one(NavTree).focus_nav(self.selected)
@@ -187,10 +182,10 @@ class ActionsMixin(_CoopOSHost):
 
     def _next_nav_after_delete(self: _CoopOSHost, nav: Nav) -> Nav:
         """Return the Nav to focus after *nav* is deleted."""
-        if nav.kind == "task" and self.state:
-            deleted = next((t for t in self.state.tasks if t.id == nav.id), None)
+        if nav.kind == "task" and self.sm.state:
+            deleted = next((t for t in self.sm.state.tasks if t.id == nav.id), None)
             parent_id = deleted.parent if deleted else None
-            siblings = [t for t in self.state.tasks if t.parent == parent_id]
+            siblings = [t for t in self.sm.state.tasks if t.parent == parent_id]
             idx = next((i for i, t in enumerate(siblings) if t.id == nav.id), None)
             if idx is not None and len(siblings) > 1:
                 sibling = siblings[idx + 1] if idx + 1 < len(siblings) else siblings[idx - 1]
@@ -218,7 +213,7 @@ class ActionsMixin(_CoopOSHost):
     ) -> None:
         if not await self.push_screen_wait(ConfirmDeleteScreen(name)):
             return
-        store = self.store.store_for(nav.kind)
+        store = self.sm.store.store_for(nav.kind)
         deleted = store.delete(nav.id) if store else False
         if deleted:
             self.selected = next_nav if next_nav and next_nav.kind != "section" else None
@@ -243,18 +238,18 @@ class ActionsMixin(_CoopOSHost):
         options = [(s.value, s.value.replace("_", " ").title()) for s in status_enum]
         result = await self.push_screen_wait(FilterScreen(title, options, current))
         if result is not None:
-            setattr(self, attr, result)
+            setattr(self.sm, attr, result)
             self._reload()
             self._update_right_hints()
 
     @work
     async def action_filter_roles(self: _CoopOSHost) -> None:
-        await self._open_filter("Filter Roles", RoleStatus, self.role_filters, "role_filters")
+        await self._open_filter("Filter Roles", RoleStatus, self.sm.role_filters, "role_filters")
 
     @work
     async def action_filter_milestones(self: _CoopOSHost) -> None:
-        await self._open_filter("Filter Milestones", MilestoneStatus, self.milestone_filters, "milestone_filters")
+        await self._open_filter("Filter Milestones", MilestoneStatus, self.sm.milestone_filters, "milestone_filters")
 
     @work
     async def action_filter_tasks(self: _CoopOSHost) -> None:
-        await self._open_filter("Filter Tasks", TaskStatus, self.task_filters, "task_filters")
+        await self._open_filter("Filter Tasks", TaskStatus, self.sm.task_filters, "task_filters")

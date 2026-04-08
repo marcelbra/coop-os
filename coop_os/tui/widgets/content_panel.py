@@ -6,6 +6,8 @@ from textual.containers import ScrollableContainer
 from textual.widget import Widget
 from textual.widgets import Markdown
 
+from coop_os.backend.models import ProjectState
+from coop_os.tui.widgets.config import AppConfig
 from coop_os.tui.widgets.structured_editor import StructuredEditor
 from coop_os.tui.widgets.text_area import DetailTextArea
 
@@ -48,19 +50,21 @@ class ContentPanel(Widget):
         self.add_class("-editing")
         ta.focus()
 
-    def show_struct_view(self, item: Any, kind: str) -> None:
+    def show_struct_view(self, item: Any, kind: str, cfg: AppConfig, state: ProjectState) -> None:
         """Structured view mode (read-only) for milestone / task / note."""
         se = self.query_one(StructuredEditor)
-        se.load(item, kind)
+        se.load(item, kind, cfg, state)
         se.set_editable(False)
         self.remove_class("-editing")
         self.remove_class("-editing-struct")
         self.add_class("-view-struct")
 
-    def enter_structured_edit(self, item: Any, kind: str, select_all: bool = False) -> None:
+    def enter_structured_edit(
+        self, item: Any, kind: str, cfg: AppConfig, state: ProjectState, select_all: bool = False
+    ) -> None:
         """Structured edit mode for milestone / task / note."""
         se = self.query_one(StructuredEditor)
-        se.load(item, kind)
+        se.load(item, kind, cfg, state)
         se.set_editable(True)
         self.remove_class("-editing")
         self.remove_class("-view-struct")
