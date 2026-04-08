@@ -1,4 +1,4 @@
-.PHONY: install lint format fix run test
+.PHONY: install lint format fix run test check
 
 install:  ## Install project dependencies
 	uv sync --group dev
@@ -16,6 +16,8 @@ fix:  ## Auto-fix ruff errors
 
 test:  ## Run the test suite
 	uv run pytest tests/
+
+check: lint test  ## Run lint and tests (CI)
 
 run:  ## Start the TUI
 	uv run coop-os start

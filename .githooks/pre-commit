@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
 set -e
 
-echo "Running linters..."
-uv run ruff check coop_os
-uv run basedpyright coop_os
-echo "Lint passed."
+make check

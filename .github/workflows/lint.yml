@@ -1,4 +1,4 @@
-name: Lint
+name: CI
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: ["**"]
 
 jobs:
-  lint:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,11 +18,5 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      - name: Run ruff
-        run: uv run ruff check coop_os
-
-      - name: Run basedpyright
-        run: uv run basedpyright coop_os
-
-      - name: Run tests
-        run: uv run pytest tests/
+      - name: Run check
+        run: make check
