@@ -89,7 +89,8 @@ class CoopOSApp(ActionsMixin, App[None]):
         """
         state = self.sm.load()
         self.query_one(NavTree).populate(
-            state, self.root, self.sm.role_filters, self.sm.milestone_filters, self.sm.task_filters
+            state, self.root, self.sm.role_filters, self.sm.milestone_filters, self.sm.task_filters,
+            task_dirs=self.sm.task_dirs(),
         )
 
     def _reload(self) -> None:
@@ -223,6 +224,10 @@ class CoopOSApp(ActionsMixin, App[None]):
             path = self._item_path()
             md = path.read_text(encoding="utf-8") if path and path.exists() else ""
             await content.show_view(md)
+            self.query_one(NavTree).focus()
+        elif self.selected.kind in ("task_file", "task_dir"):
+            await content.show_view("_Cannot be rendered yet :)_")
+            self.query_one(NavTree).focus()
         else:
             item = self._item()
             if not item or not self.sm.state:

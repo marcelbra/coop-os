@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from rich.text import Text
@@ -11,6 +12,16 @@ from textual.widgets._tree import TreeNode
 from coop_os.backend.models import ProjectState, Task
 from coop_os.tui.nav import Nav, truncate_label
 from coop_os.tui.widgets.config import SCANNED_ICONS, AppConfig, read_config
+
+_TASK_DIR_PREFIX = re.compile(r"^task-\d+-")
+
+
+def _list_task_extras(task_dir: Path) -> list[Path]:
+    """Return items in task_dir that are not description.md or child task dirs."""
+    return sorted(
+        p for p in task_dir.iterdir()
+        if p.name != "description.md" and not _TASK_DIR_PREFIX.match(p.name)
+    )
 
 
 class NavTree(Tree[Nav | None]):
@@ -82,6 +93,7 @@ class NavTree(Tree[Nav | None]):
         if not isinstance(nav, Nav):
             event.stop()
             return
+        _EDITABLE_KINDS = {"role", "milestone", "task", "note", "context", "skill", "agent"}
         if nav.kind != "section":
             # Two-step: first → expands a collapsed branch (task with subtasks),
             # moving cursor to first child. Second → opens the editor.
@@ -90,7 +102,7 @@ class NavTree(Tree[Nav | None]):
                 node.expand()
                 first = list(node.children)[0]
                 self.app.call_after_refresh(lambda n=first: self.move_cursor(n))
-            else:
+            elif nav.kind in _EDITABLE_KINDS:
                 self.post_message(NavTree.EditRequested(nav))
         else:
             # Section node: expand and navigate to first child.
@@ -188,7 +200,7 @@ class NavTree(Tree[Nav | None]):
 
     # ── Data methods ──────────────────────────────────────────────────────
 
-    def _expanded_state(self) -> tuple[set[str], set[str]]:
+    def _expanded_state(self) -> tuple[set[str], set[str], set[str]]:
         all_nodes = self.iter_all_nodes(self.root)
         expanded = {
             n.data.section
@@ -200,7 +212,12 @@ class NavTree(Tree[Nav | None]):
             for n in all_nodes
             if isinstance(n.data, Nav) and n.data.kind == "task" and n.is_expanded
         }
-        return expanded, expanded_tasks
+        expanded_dirs = {
+            n.data.id
+            for n in all_nodes
+            if isinstance(n.data, Nav) and n.data.kind == "task_dir" and n.is_expanded
+        }
+        return expanded, expanded_tasks, expanded_dirs
 
     @staticmethod
     def _section_label(arrow: str, name: str, filtered: bool) -> Text:
@@ -215,10 +232,12 @@ class NavTree(Tree[Nav | None]):
         state: ProjectState,
         expanded: set[str],
         expanded_tasks: set[str],
+        expanded_dirs: set[str],
         cfg: AppConfig,
         role_filters: set[str],
         milestone_filters: set[str],
         task_filters: set[str],
+        task_dirs: dict[str, Path],
     ) -> None:
         visible_roles = [r for r in state.roles if not role_filters or r.status in role_filters]
         roles_expand = "roles" in expanded and bool(visible_roles)
@@ -255,7 +274,7 @@ class NavTree(Tree[Nav | None]):
             data=Nav("section", "", "tasks"),
             expand=tasks_expand,
         )
-        self._add_task_nodes(tasks_node, state.tasks, None, cfg, expanded_tasks, task_filters)
+        self._add_task_nodes(tasks_node, state.tasks, None, cfg, expanded_tasks, task_filters, task_dirs, expanded_dirs)
 
     def populate(
         self,
@@ -264,6 +283,7 @@ class NavTree(Tree[Nav | None]):
         role_filters: set[str] | None = None,
         milestone_filters: set[str] | None = None,
         task_filters: set[str] | None = None,
+        task_dirs: dict[str, Path] | None = None,
     ) -> None:
         """Rebuild tree from *state*, preserving section expansion.
 
@@ -273,8 +293,9 @@ class NavTree(Tree[Nav | None]):
         role_filters = role_filters or set()
         milestone_filters = milestone_filters or set()
         task_filters = task_filters or set()
+        task_dirs = task_dirs or {}
 
-        expanded, expanded_tasks = self._expanded_state()
+        expanded, expanded_tasks, expanded_dirs = self._expanded_state()
         self.clear()
 
         cfg = read_config(root)
@@ -288,7 +309,10 @@ class NavTree(Tree[Nav | None]):
         # ── Workspaces group ──────────────────────────────────────
         _header("Workspaces")
         _sep()
-        self._build_workspaces(state, expanded, expanded_tasks, cfg, role_filters, milestone_filters, task_filters)
+        self._build_workspaces(
+            state, expanded, expanded_tasks, expanded_dirs,
+            cfg, role_filters, milestone_filters, task_filters, task_dirs,
+        )
         _sep()
 
         # ── User group ────────────────────────────────────────────
@@ -352,6 +376,17 @@ class NavTree(Tree[Nav | None]):
             result.extend(self.iter_all_nodes(child))
         return result
 
+    def _add_path_node(self, parent_node: TreeNode[Nav | None], path: Path, expanded_dirs: set[str]) -> None:
+        """Recursively add a filesystem file or directory node under *parent_node*."""
+        icon = "📄" if path.is_file() else "📁"
+        label = truncate_label(f"{icon} {path.name}")
+        if path.is_dir():
+            node = parent_node.add(label, data=Nav("task_dir", str(path), "tasks"), expand=str(path) in expanded_dirs)
+            for child in sorted(path.iterdir()):
+                self._add_path_node(node, child, expanded_dirs)
+        else:
+            parent_node.add_leaf(label, data=Nav("task_file", str(path), "tasks"))
+
     def _add_task_nodes(
         self,
         parent_node: TreeNode[Nav | None],
@@ -360,6 +395,8 @@ class NavTree(Tree[Nav | None]):
         cfg: AppConfig,
         expanded_tasks: set[str],
         task_filters: set[str],
+        task_dirs: dict[str, Path],
+        expanded_dirs: set[str],
     ) -> None:
         children = [t for t in all_tasks if t.parent == parent_id]
         for t in children:
@@ -367,9 +404,15 @@ class NavTree(Tree[Nav | None]):
                 continue
             label = truncate_label(f"{cfg.task_statuses.get(t.status, '•')} {t.title}")
             has_subtasks = any(c.parent == t.id for c in all_tasks)
+            task_dir = task_dirs.get(t.id)
+            extra = _list_task_extras(task_dir) if task_dir else []
             nav = Nav("task", t.id, "tasks")
-            if has_subtasks:
+            if has_subtasks or extra:
                 branch = parent_node.add(label, data=nav, expand=t.id in expanded_tasks)
-                self._add_task_nodes(branch, all_tasks, t.id, cfg, expanded_tasks, task_filters)
+                self._add_task_nodes(
+                    branch, all_tasks, t.id, cfg, expanded_tasks, task_filters, task_dirs, expanded_dirs
+                )
+                for p in extra:
+                    self._add_path_node(branch, p, expanded_dirs)
             else:
                 parent_node.add_leaf(label, data=nav)

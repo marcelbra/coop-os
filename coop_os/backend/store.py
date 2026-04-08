@@ -305,6 +305,24 @@ class TaskStore:
         d = _find_task_dir(self._dir, task_id)
         return d / "description.md" if d else None
 
+    def all_task_dirs(self) -> dict[str, Path]:
+        """Return a mapping of task_id -> task_dir_path for every known task."""
+        result: dict[str, Path] = {}
+        self._collect_dirs(self._dir, result)
+        return result
+
+    def _collect_dirs(self, search_dir: Path, result: dict[str, Path]) -> None:
+        if not search_dir.exists():
+            return
+        for d in search_dir.iterdir():
+            if _is_task_dir(d):
+                desc = d / "description.md"
+                if desc.exists():
+                    tid = _fm_id(desc)
+                    if tid:
+                        result[tid] = d
+                self._collect_dirs(d, result)
+
 
 class NoteStore(FlatFileStore[Note]):
     def __init__(self, root: Path) -> None:
