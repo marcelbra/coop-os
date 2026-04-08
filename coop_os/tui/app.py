@@ -76,10 +76,23 @@ class CoopOSApp(App[None]):
 
     # ── State ─────────────────────────────────────────────────────────────────
 
-    def _reload(self) -> None:
+    def _sync_state(self) -> None:
+        """Load state from disk and repopulate the tree.
+
+        This is the single authoritative sync point between disk and UI. Call it
+        any time the on-disk files change (after a save, create, or delete) to
+        ensure self.state and the NavTree are consistent. It deliberately does
+        not touch focus, view mode, or selection — callers own those concerns.
+        """
         self.state = self.store.load()
+        self.query_one(NavTree).populate(
+            self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters
+        )
+
+    def _reload(self) -> None:
+        self._sync_state()
+        assert self.state is not None
         tree = self.query_one(NavTree)
-        tree.populate(self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters)
         if self.selected:
             tree.focus_nav(self.selected)
             self._show_view()
@@ -198,16 +211,10 @@ class CoopOSApp(App[None]):
     @on(StructuredEditor.Changed)
     def on_structured_editor_changed(self) -> None:
         self._save_current()
-        tree = self.query_one(NavTree)
-        assert self.state is not None
-        tree.populate(self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters)
 
     @on(SelectInput.ValueSelected)
     def on_select_value_selected(self) -> None:
         self._save_current()
-        tree = self.query_one(NavTree)
-        assert self.state is not None
-        tree.populate(self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters)
 
     def _exit_edit_mode(self) -> None:
         self._save_current()
@@ -218,8 +225,6 @@ class CoopOSApp(App[None]):
         self._show_view()
         self._update_footer_hints(self.selected)
         tree = self.query_one(NavTree)
-        assert self.state is not None
-        tree.populate(self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters)
         tree.focus()
         if self.selected:
             tree.focus_nav(self.selected)
@@ -273,7 +278,7 @@ class CoopOSApp(App[None]):
             return
         try:
             path.write_text(content.editor_text, encoding="utf-8")
-            self.state = self.store.load()
+            self._sync_state()
         except Exception as e:
             self.notify(str(e), severity="error", timeout=4)
 
@@ -348,11 +353,9 @@ class CoopOSApp(App[None]):
                 self.store.notes.save(new_item)
                 kind = "note"
 
-        self.state = self.store.load()
-        tree = self.query_one(NavTree)
-        tree.populate(self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters)
+        self._sync_state()
         self.selected = Nav(kind, new_item.id, section)
-        tree.focus_nav(self.selected)
+        self.query_one(NavTree).focus_nav(self.selected)
         self._show_edit(select_all=True)
 
     def action_new_subtask(self) -> None:
@@ -369,11 +372,9 @@ class CoopOSApp(App[None]):
             parent=self.selected.id,
         )
         self.store.tasks.save(new_item)
-        self.state = self.store.load()
-        tree = self.query_one(NavTree)
-        tree.populate(self.state, self.root, self.role_filters, self.milestone_filters, self.task_filters)
+        self._sync_state()
         self.selected = Nav("task", new_item.id, "tasks")
-        tree.focus_nav(self.selected)
+        self.query_one(NavTree).focus_nav(self.selected)
         self._show_edit(select_all=True)
 
     def action_delete_item(self) -> None:
