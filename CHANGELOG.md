@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-04-08
+
+### Added
+- Per-type file icons and smart delete navigation
+- Task folder files shown as navigable tree nodes
+- Syntax highlighting for task files in BodyTextArea
+- Tab inserts two spaces in DetailTextArea
+
+### Fixed
+- Show raw text for agent.md; focus body on right-arrow edit
+- README formatting and contributing link updates
+
 ## [0.2.1] - 2026-04-08
 
 ### Fixed
