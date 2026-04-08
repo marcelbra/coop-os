@@ -10,7 +10,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import Tree
 
-from coop_os.backend.models import Doc, Milestone, Note, ProjectState, Role, Skill, Task
+from coop_os.backend.models import Context, Milestone, Note, ProjectState, Role, Skill, Task
 from coop_os.backend.store import ProjectStore
 from coop_os.tui.confirm_delete import ConfirmDeleteScreen
 from coop_os.tui.filter_screen import FilterScreen
@@ -31,7 +31,7 @@ _SECTION_TO_KIND: dict[str, str] = {
     "milestones": "milestone",
     "tasks": "task",
     "notes": "note",
-    "docs": "doc",
+    "contexts": "context",
     "skills": "skill",
 }
 
@@ -103,7 +103,7 @@ class CoopOSApp(App[None]):
                 timeout=4,
             )
 
-    def _item(self) -> Role | Milestone | Task | Note | Doc | Skill | None:
+    def _item(self) -> Role | Milestone | Task | Note | Context | Skill | None:
         n = self.selected
         if not n or not self.state:
             return None
@@ -117,8 +117,8 @@ class CoopOSApp(App[None]):
                 return next((t for t in s.tasks if t.id == n.id), None)
             case "note":
                 return next((nt for nt in s.notes if nt.id == n.id), None)
-            case "doc":
-                return next((d for d in s.docs if d.id == n.id), None)
+            case "context":
+                return next((d for d in s.contexts if d.id == n.id), None)
             case "skill":
                 return next((sk for sk in s.skills if sk.id == n.id), None)
             case _:
@@ -146,7 +146,7 @@ class CoopOSApp(App[None]):
                 pairs.append(("n", f"new {new_kind}"))
             if nav.kind == "task":
                 pairs.append(("^n", "new subtask"))
-            deletable = {"role", "milestone", "task", "note", "doc", "skill"}
+            deletable = {"role", "milestone", "task", "note", "context", "skill"}
             if nav.kind in deletable:
                 pairs.append(("d", "delete"))
 
@@ -299,7 +299,7 @@ class CoopOSApp(App[None]):
             section = nav.section if nav and nav.kind == "section" else "notes"
 
         today = date.today().isoformat()
-        new_item: Role | Milestone | Task | Note | Doc | Skill
+        new_item: Role | Milestone | Task | Note | Context | Skill
         kind: str
 
         match section:
@@ -332,13 +332,13 @@ class CoopOSApp(App[None]):
                 )
                 self.store.tasks.save(new_item)
                 kind = "task"
-            case "docs":
-                new_item = Doc(
-                    id=self.store.docs.next_id(),
+            case "contexts":
+                new_item = Context(
+                    id=self.store.contexts.next_id(),
                     title="New Document",
                 )
-                self.store.docs.save(new_item)
-                kind = "doc"
+                self.store.contexts.save(new_item)
+                kind = "context"
             case "skills":
                 new_item = Skill(
                     id=self.store.skills.next_id(),
@@ -430,7 +430,7 @@ class CoopOSApp(App[None]):
             "milestone": self.store.milestones,
             "task": self.store.tasks,
             "note": self.store.notes,
-            "doc": self.store.docs,
+            "context": self.store.contexts,
             "skill": self.store.skills,
         }
         store = store_map.get(nav.kind)
