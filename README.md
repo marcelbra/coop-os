@@ -11,22 +11,24 @@
 
 ---
 
-`coop-os` is a lightweight context layer for agent-human co-working. Unlike classic note taking apps and todo lists `coop-os` all around simple text files that any agent harness can edit. Humans can navigate and edit in a lightweight terminal-only UI.
+**coop-os** is a lightweight context layer for agent-human co-working. Unlike classic note taking apps and todo lists it works around simple markdown files that any agent harness can edit. Humans can navigate and edit in a lightweight terminal-only UI.
 
-three core concepts:
-- the workspace - as tree with an opinionated naming as `roles` -> `milestones` -> `tasks`
-- agent agent as primary worker - augmented by skills and workflows
-- user - user information and personal notetaking
+**Three core concepts**
+- the workspace — a tree with an opinionated structure: `roles` → `milestones` → `tasks`
+- an agent space — primary worker definitions, augmented by skills and workflows
+- a user space — personal context and notetaking
 
-features:
+**Features**
 - note taking on steroids
-- agent-driven design
-- seamless and smooth TUI
+- agent-first design
+- seamless and smooth TUI for humans
 
-coming up:
-- Skills 2.0 - improved workflow integration incl. mcp server
+**Coming soon**
+- Skills 2.0 — improved workflow integration incl. MCP server
 - Examples and tutorials
-- An agent-driven CLI mostly for control and performance - for now agent harnesses file editing should work
+- An agent-driven CLI for control and performance
+
+Collaboration welcome — see [Contributing](https://github.com/marcelbra/coop-os?tab=contributing-ov-file).
 
 ## Install
 
@@ -51,7 +53,7 @@ Requires Python 3.13+. Subject to downgrade.
 
 ## Collaboration
 
-Improved PR and release convention and how to collaborate coming soon.
+See [Contributing](https://github.com/marcelbra/coop-os?tab=contributing-ov-file) for the branching model, PR workflow, and release process.
 
 
 ## Notes

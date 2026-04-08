@@ -4,6 +4,55 @@ from pathlib import Path
 
 SCANNED_ICONS: dict[str, str] = {"true": "✓", "false": "!"}
 
+FILE_ICONS: dict[str, str] = {
+    # Python
+    ".py": "λ", ".ipynb": "λ",
+    # JavaScript / TypeScript
+    ".js": "◎", ".jsx": "◎", ".ts": "◎", ".tsx": "◎",
+    # Shell
+    ".sh": "$", ".bash": "$", ".zsh": "$", ".fish": "$",
+    # Markup / docs
+    ".md": "¶", ".rst": "¶",
+    ".html": "◁", ".htm": "◁",
+    ".xml": "◁",
+    # Styles
+    ".css": "≋", ".scss": "≋", ".sass": "≋",
+    # Structured data
+    ".json": "⊞", ".jsonc": "⊞",
+    ".yml": "≈", ".yaml": "≈", ".toml": "≈", ".env": "≈", ".ini": "≈", ".cfg": "≈",
+    # Tabular
+    ".csv": "⊟", ".tsv": "⊟",
+    # Database
+    ".sql": "▦",
+    # Plain text / logs
+    ".txt": "≡", ".log": "≡",
+    # Documents
+    ".pdf": "▤",
+    # Images
+    ".png": "▣", ".jpg": "▣", ".jpeg": "▣", ".gif": "▣",
+    ".svg": "▣", ".webp": "▣", ".ico": "▣",
+}
+FILE_ICON_DEFAULT = "·"
+DIR_ICON = "▸"
+
+# Maps file extensions to Textual TextArea language identifiers (tree-sitter).
+FILE_LANGUAGES: dict[str, str] = {
+    ".py": "python", ".ipynb": "python",
+    ".js": "javascript", ".jsx": "javascript",
+    ".ts": "typescript", ".tsx": "typescript",
+    ".sh": "bash", ".bash": "bash", ".zsh": "bash", ".fish": "bash",
+    ".json": "json", ".jsonc": "json",
+    ".yml": "yaml", ".yaml": "yaml",
+    ".toml": "toml",
+    ".html": "html", ".htm": "html",
+    ".css": "css", ".scss": "css", ".sass": "css",
+    ".sql": "sql",
+    ".xml": "xml",
+    ".rs": "rust",
+    ".go": "go",
+    ".md": "markdown", ".markdown": "markdown",
+}
+
 
 class AppConfig:
     def __init__(

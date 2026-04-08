@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import shutil
 from datetime import date
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from textual import work
@@ -56,6 +58,7 @@ class _CoopOSHost(_HostBase):
     def _update_right_hints(self) -> None: ...
 
     # ActionsMixin methods called cross-method (declared here so self: _CoopOSHost resolves them)
+    def _next_nav_after_file_delete(self, nav: Nav) -> Nav: ...
     def _next_nav_after_delete(self, nav: Nav) -> Nav: ...
     def _confirm_and_delete(self, nav: Nav, name: str, next_nav: Nav | None) -> Worker[None]: ...
     async def _open_filter(
@@ -174,14 +177,48 @@ class ActionsMixin(_CoopOSHost):
         ):
             return
         nav = self.selected
-        item = self._item()
-        name = getattr(item, "title", None) or getattr(item, "name", None) or nav.id
+        if nav.kind in ("task_file", "task_dir"):
+            name = Path(nav.id).name
+        else:
+            item = self._item()
+            name = getattr(item, "title", None) or getattr(item, "name", None) or nav.id
 
         next_nav = self._next_nav_after_delete(nav)
         self._confirm_and_delete(nav, name, next_nav)
 
+    def _next_nav_after_file_delete(self: _CoopOSHost, nav: Nav) -> Nav:
+        """Return the Nav to focus after a task_file or task_dir is deleted."""
+        tree = self.query_one(NavTree)
+        for node in tree.iter_all_nodes(tree.root):
+            if not (isinstance(node.data, Nav) and node.data.id == nav.id and node.data.kind == nav.kind):
+                continue
+            parent_node = node.parent
+            if parent_node is None:
+                break
+            siblings = [
+                n for n in parent_node.children
+                if isinstance(n.data, Nav) and n.data.kind in ("task_file", "task_dir")
+            ]
+            idx = next((i for i, n in enumerate(siblings) if isinstance(n.data, Nav) and n.data.id == nav.id), None)
+            if idx is None:
+                break
+            if idx + 1 < len(siblings):
+                d = siblings[idx + 1].data
+                return d if isinstance(d, Nav) else Nav("section", "", "tasks")
+            if idx > 0:
+                d = siblings[idx - 1].data
+                return d if isinstance(d, Nav) else Nav("section", "", "tasks")
+            # Last child — go to parent; tree rebuild will close it if empty
+            parent_data = parent_node.data
+            if isinstance(parent_data, Nav) and parent_data.kind in ("task", "task_dir"):
+                return parent_data
+            break
+        return Nav("section", "", "tasks")
+
     def _next_nav_after_delete(self: _CoopOSHost, nav: Nav) -> Nav:
         """Return the Nav to focus after *nav* is deleted."""
+        if nav.kind in ("task_file", "task_dir"):
+            return self._next_nav_after_file_delete(nav)
         if nav.kind == "task" and self.sm.state:
             deleted = next((t for t in self.sm.state.tasks if t.id == nav.id), None)
             parent_id = deleted.parent if deleted else None
@@ -213,8 +250,19 @@ class ActionsMixin(_CoopOSHost):
     ) -> None:
         if not await self.push_screen_wait(ConfirmDeleteScreen(name)):
             return
-        store = self.sm.store.store_for(nav.kind)
-        deleted = store.delete(nav.id) if store else False
+        if nav.kind in ("task_file", "task_dir"):
+            p = Path(nav.id)
+            if p.is_file():
+                p.unlink()
+                deleted = True
+            elif p.is_dir():
+                shutil.rmtree(p)
+                deleted = True
+            else:
+                deleted = False
+        else:
+            store = self.sm.store.store_for(nav.kind)
+            deleted = store.delete(nav.id) if store else False
         if deleted:
             self.selected = next_nav if next_nav and next_nav.kind != "section" else None
             self._reload()

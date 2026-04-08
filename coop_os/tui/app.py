@@ -31,6 +31,7 @@ from coop_os.tui.widgets import (
     SplitFooter,
     StructuredEditor,
 )
+from coop_os.tui.widgets.config import FILE_LANGUAGES
 
 _SECTION_TO_KIND: dict[str, str] = {
     "roles": "role",
@@ -89,7 +90,8 @@ class CoopOSApp(ActionsMixin, App[None]):
         """
         state = self.sm.load()
         self.query_one(NavTree).populate(
-            state, self.root, self.sm.role_filters, self.sm.milestone_filters, self.sm.task_filters
+            state, self.root, self.sm.role_filters, self.sm.milestone_filters, self.sm.task_filters,
+            task_dirs=self.sm.task_dirs(),
         )
 
     def _reload(self) -> None:
@@ -221,8 +223,28 @@ class CoopOSApp(ActionsMixin, App[None]):
             return
         if self.selected.kind == "agent":
             path = self._item_path()
-            md = path.read_text(encoding="utf-8") if path and path.exists() else ""
-            await content.show_view(md)
+            if not path or not path.exists() or not self.sm.state:
+                return
+            text = path.read_text(encoding="utf-8")
+            agent_doc = SimpleNamespace(content=text)
+            content.show_struct_view(agent_doc, "agent", self.sm.cfg(), self.sm.state)
+            self.query_one(NavTree).focus()
+        elif self.selected.kind == "task_file":
+            path = self._item_path()
+            if not path or not path.exists() or not self.sm.state:
+                return
+            try:
+                text = path.read_text(encoding="utf-8")
+            except Exception:
+                await content.show_view("_Cannot be rendered yet :)_")
+                self.query_one(NavTree).focus()
+                return
+            file_doc = SimpleNamespace(content=text, language=FILE_LANGUAGES.get(path.suffix.lower(), ""))
+            content.show_struct_view(file_doc, "agent", self.sm.cfg(), self.sm.state)
+            self.query_one(NavTree).focus()
+        elif self.selected.kind == "task_dir":
+            content.clear()
+            self.query_one(NavTree).focus()
         else:
             item = self._item()
             if not item or not self.sm.state:
@@ -244,6 +266,16 @@ class CoopOSApp(ActionsMixin, App[None]):
             if not self.sm.state:
                 return
             content.enter_structured_edit(agent_doc, "agent", self.sm.cfg(), self.sm.state)
+        elif self.selected.kind == "task_file":
+            path = self._item_path()
+            if not path or not path.exists() or not self.sm.state:
+                return
+            try:
+                text = path.read_text(encoding="utf-8")
+            except Exception:
+                return
+            file_doc = SimpleNamespace(content=text, language=FILE_LANGUAGES.get(path.suffix.lower(), ""))
+            content.enter_structured_edit(file_doc, "agent", self.sm.cfg(), self.sm.state)
         else:
             item = self._item()
             if not item or not self.sm.state:

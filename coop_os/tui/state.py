@@ -51,10 +51,16 @@ class StateManager:
             return None
         return next((i for i in getattr(self.state, attr) if i.id == nav.id), None)
 
+    def task_dirs(self) -> dict[str, Path]:
+        """Return a mapping of task_id -> task_dir_path for all tasks."""
+        return self.store.tasks.all_task_dirs()
+
     def item_path(self, nav: Nav | None) -> Path | None:
         """Resolve disk path for the item pointed to by *nav*."""
         if not nav:
             return None
         if nav.kind == "agent":
             return self.root / "coop_os" / "agent" / "AGENT.md"
+        if nav.kind == "task_file":
+            return Path(nav.id)
         return self.store.find_item_path(nav.kind, nav.id)

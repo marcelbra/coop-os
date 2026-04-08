@@ -58,6 +58,12 @@ class DetailTextArea(TextArea):
                 self.action_cursor_down(True)
                 return
 
+        if event.key == "tab":
+            event.prevent_default()
+            event.stop()
+            self.insert("  ")
+            return
+
         if event.key == "left" and self.cursor_location[1] == 0:
             event.prevent_default()
             event.stop()
