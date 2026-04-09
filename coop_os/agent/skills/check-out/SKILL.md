@@ -1,6 +1,6 @@
 ---
-command: /check-out
-id: skill-2
+name: check-out
+description: Daily end-of-day check-out. Reviews what moved, captures loose ends, flags blockers, and previews tomorrow's priorities.
 ---
 
 ## Steps

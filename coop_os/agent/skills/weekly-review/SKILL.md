@@ -1,6 +1,6 @@
 ---
-id: skill-4
-command: /weekly-review
+name: weekly-review
+description: Weekly review workflow. Best done Sunday evening or Friday afternoon. Covers task progress, habits, goal tracking, and next-week planning.
 ---
 
 Best done: Sunday evening or Friday afternoon.
