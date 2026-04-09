@@ -242,8 +242,10 @@ class NavTree(Tree[Nav | None]):
         milestone_filters: set[str],
         task_filters: set[str],
         task_dirs: dict[str, Path],
+        visible_role_ids: set[str],
+        visible_milestone_ids: set[str],
     ) -> None:
-        visible_roles = [r for r in state.roles if not role_filters or r.status in role_filters]
+        visible_roles = [r for r in state.roles if not role_filters or r.id in visible_role_ids]
         roles_expand = "roles" in expanded and bool(visible_roles)
         roles_node = self.root.add(
             self._section_label("▼" if roles_expand else "▶", "Roles", bool(role_filters)),
@@ -256,7 +258,11 @@ class NavTree(Tree[Nav | None]):
                 data=Nav("role", r.id, "roles"),
             )
 
-        visible_milestones = [m for m in state.milestones if not milestone_filters or m.status in milestone_filters]
+        ms_filter_active = bool(role_filters or milestone_filters)
+        visible_milestones = [
+            m for m in state.milestones
+            if not ms_filter_active or m.id in visible_milestone_ids
+        ]
         ms_expand = "milestones" in expanded and bool(visible_milestones)
         ms_node = self.root.add(
             self._section_label("▼" if ms_expand else "▶", "Milestones", bool(milestone_filters)),
@@ -269,8 +275,12 @@ class NavTree(Tree[Nav | None]):
                 data=Nav("milestone", m.id, "milestones"),
             )
 
+        ms_ids_for_tasks = visible_milestone_ids if ms_filter_active else None
         has_visible_tasks = any(
-            t for t in state.tasks if t.parent is None and (not task_filters or t.status in task_filters)
+            t for t in state.tasks
+            if t.parent is None
+            and (not task_filters or t.status in task_filters)
+            and (ms_ids_for_tasks is None or t.milestone is None or t.milestone in ms_ids_for_tasks)
         )
         tasks_expand = "tasks" in expanded and has_visible_tasks
         tasks_node = self.root.add(
@@ -278,7 +288,10 @@ class NavTree(Tree[Nav | None]):
             data=Nav("section", "", "tasks"),
             expand=tasks_expand,
         )
-        self._add_task_nodes(tasks_node, state.tasks, None, cfg, expanded_tasks, task_filters, task_dirs, expanded_dirs)
+        self._add_task_nodes(
+            tasks_node, state.tasks, None, cfg, expanded_tasks, task_filters, task_dirs, expanded_dirs,
+            ms_ids_for_tasks,
+        )
 
     def populate(
         self,
@@ -288,16 +301,20 @@ class NavTree(Tree[Nav | None]):
         milestone_filters: set[str] | None = None,
         task_filters: set[str] | None = None,
         task_dirs: dict[str, Path] | None = None,
+        visible_role_ids: set[str] | None = None,
+        visible_milestone_ids: set[str] | None = None,
     ) -> None:
         """Rebuild tree from *state*, preserving section expansion.
 
-        A non-empty *_filters* set restricts that section to matching statuses.
-        An empty set (or None) shows everything.
+        Pass pre-computed *visible_role_ids* and *visible_milestone_ids* from
+        StateManager so filtering logic lives in one place.
         """
         role_filters = role_filters or set()
         milestone_filters = milestone_filters or set()
         task_filters = task_filters or set()
         task_dirs = task_dirs or {}
+        visible_role_ids = visible_role_ids or set()
+        visible_milestone_ids = visible_milestone_ids or set()
 
         expanded, expanded_tasks, expanded_dirs = self._expanded_state()
         self.clear()
@@ -316,6 +333,7 @@ class NavTree(Tree[Nav | None]):
         self._build_workspaces(
             state, expanded, expanded_tasks, expanded_dirs,
             cfg, role_filters, milestone_filters, task_filters, task_dirs,
+            visible_role_ids, visible_milestone_ids,
         )
         _sep()
 
@@ -406,10 +424,18 @@ class NavTree(Tree[Nav | None]):
         task_filters: set[str],
         task_dirs: dict[str, Path],
         expanded_dirs: set[str],
+        visible_milestone_ids: set[str] | None = None,
     ) -> None:
         children = [t for t in all_tasks if t.parent == parent_id]
         for t in children:
             if task_filters and t.status not in task_filters:
+                continue
+            if (
+                parent_id is None
+                and visible_milestone_ids is not None
+                and t.milestone is not None
+                and t.milestone not in visible_milestone_ids
+            ):
                 continue
             label = truncate_label(f"{cfg.task_statuses.get(t.status, '•')} {t.title}")
             has_subtasks = any(c.parent == t.id for c in all_tasks)

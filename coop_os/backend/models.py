@@ -24,6 +24,9 @@ class MilestoneStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+Status = type[RoleStatus] | type[MilestoneStatus] | type[TaskStatus]
+
+
 class Role(BaseModel):
     id: str
     title: str

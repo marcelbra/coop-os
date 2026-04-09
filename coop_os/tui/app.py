@@ -89,9 +89,13 @@ class CoopOSApp(ActionsMixin, App[None]):
         not touch focus, view mode, or selection — callers own those concerns.
         """
         state = self.sm.load()
+        visible_role_ids = self.sm.visible_role_ids()
+        visible_milestone_ids = self.sm.visible_milestone_ids(visible_role_ids)
         self.query_one(NavTree).populate(
             state, self.root, self.sm.role_filters, self.sm.milestone_filters, self.sm.task_filters,
             task_dirs=self.sm.task_dirs(),
+            visible_role_ids=visible_role_ids,
+            visible_milestone_ids=visible_milestone_ids,
         )
 
     def _reload(self) -> None:

@@ -1,0 +1,33 @@
+FilterScreen {
+    align: center middle;
+}
+FilterScreen > #dialog {
+    width: 48;
+    height: auto;
+    background: #161b22;
+    border: heavy #30363d;
+    padding: 1 2;
+}
+FilterScreen #fs-title {
+    width: 1fr;
+    color: #58a6ff;
+    margin-bottom: 1;
+}
+FilterScreen .fs-option {
+    height: 1;
+    color: #c9d1d9;
+    padding: 0 1;
+}
+FilterScreen .fs-option.-cursor {
+    background: #1c2d45;
+    color: #e6edf3;
+}
+FilterScreen .fs-separator {
+    height: 1;
+    color: #484f58;
+    padding: 0 1;
+}
+FilterScreen #fs-hint {
+    color: #6e7681;
+    margin-top: 1;
+}
