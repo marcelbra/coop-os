@@ -68,6 +68,7 @@ class _CoopOSHost(_HostBase):
         current: set[str],
         attr: str,
         name_options: list[tuple[str, str]] | None = None,
+        dismiss_key: str | None = None,
     ) -> None: ...
 
 class ActionsMixin(_CoopOSHost):
@@ -280,13 +281,18 @@ class ActionsMixin(_CoopOSHost):
         current: set[str],
         attr: str,
         name_options: list[tuple[str, str]] | None = None,
+        dismiss_key: str | None = None,
     ) -> None:
         if self.query_one(ContentPanel).is_editing:
             return
-        options: list[tuple[str, str]] = [(s.value, s.value.replace("_", " ").title()) for s in status_enum]
+        status_opts: list[tuple[str, str]] = [(s.value, s.value.replace("_", " ").title()) for s in status_enum]
         if name_options:
-            options += [("", "── Names ──")] + name_options
-        result = await self.push_screen_wait(FilterScreen(title, options, current))
+            options: list[tuple[str, str]] = (
+                [("", "── Statuses ──")] + status_opts + [("", "── Names ──")] + name_options
+            )
+        else:
+            options = status_opts
+        result = await self.push_screen_wait(FilterScreen(title, options, current, dismiss_key=dismiss_key))
         if result is not None:
             setattr(self.sm, attr, result)
             self.sm.prune_downstream_filters()
@@ -296,7 +302,9 @@ class ActionsMixin(_CoopOSHost):
     @work
     async def action_filter_roles(self: _CoopOSHost) -> None:
         role_opts = [(r.id, r.title) for r in self.sm.state.roles] if self.sm.state else []
-        await self._open_filter("Filter Roles", RoleStatus, self.sm.role_filters, "role_filters", role_opts)
+        await self._open_filter(
+            "Filter Roles", RoleStatus, self.sm.role_filters, "role_filters", role_opts, dismiss_key="r"
+        )
 
     @work
     async def action_filter_milestones(self: _CoopOSHost) -> None:
@@ -305,9 +313,10 @@ class ActionsMixin(_CoopOSHost):
         visible_role_ids = self.sm.visible_role_ids()
         ms_opts = [(m.id, m.title) for m in self.sm.milestones_in_role_scope(visible_role_ids)]
         await self._open_filter(
-            "Filter Milestones", MilestoneStatus, self.sm.milestone_filters, "milestone_filters", ms_opts
+            "Filter Milestones", MilestoneStatus, self.sm.milestone_filters, "milestone_filters", ms_opts,
+            dismiss_key="m",
         )
 
     @work
     async def action_filter_tasks(self: _CoopOSHost) -> None:
-        await self._open_filter("Filter Tasks", TaskStatus, self.sm.task_filters, "task_filters")
+        await self._open_filter("Filter Tasks", TaskStatus, self.sm.task_filters, "task_filters", dismiss_key="t")
