@@ -22,12 +22,14 @@ class FilterScreen(ModalScreen[set[str] | None]):
         title: str,
         options: list[tuple[str, str]],
         selected: set[str],
+        dismiss_key: str | None = None,
     ) -> None:
         super().__init__()
         self._title = title
         self._options = options       # [(value, display_label), ...] — value=="" means separator
         self._selected = set(selected)
         self._cursor = next((i for i, (v, _) in enumerate(options) if v != ""), 0)
+        self._dismiss_key = dismiss_key
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
@@ -39,7 +41,7 @@ class FilterScreen(ModalScreen[set[str] | None]):
                     mark = "◉" if value in self._selected else "○"
                     cls = "fs-option -cursor" if i == self._cursor else "fs-option"
                     yield Static(f" {mark}  {label}", id=f"fs-opt-{i}", classes=cls)
-            yield Static("space toggle · t toggle group · enter confirm · esc cancel", id="fs-hint")
+            yield Static("space toggle · g toggle group · enter confirm · esc cancel", id="fs-hint")
 
     def on_mount(self) -> None:
         self.styles.background = Color(0, 0, 0, a=0.6)
@@ -95,16 +97,16 @@ class FilterScreen(ModalScreen[set[str] | None]):
 
     def _group_values(self) -> set[str]:
         """Return all selectable values in the same section as the cursor."""
-        separator = next((i for i, (v, _) in enumerate(self._options) if v == ""), None)
-        if separator is None:
+        separators = [i for i, (v, _) in enumerate(self._options) if v == ""]
+        if not separators:
             return {v for v, _ in self._options if v != ""}
-        if self._cursor < separator:
-            return {v for i, (v, _) in enumerate(self._options) if v != "" and i < separator}
-        return {v for i, (v, _) in enumerate(self._options) if v != "" and i > separator}
+        lower = max((s for s in separators if s < self._cursor), default=-1)
+        upper = min((s for s in separators if s > self._cursor), default=len(self._options))
+        return {v for i, (v, _) in enumerate(self._options) if v != "" and lower < i < upper}
 
     def on_key(self, event) -> None:
         key = event.key
-        if key == "escape":
+        if key == "escape" or (self._dismiss_key and key == self._dismiss_key):
             event.stop()
             self.dismiss(None)
         elif key == "enter":
@@ -119,6 +121,6 @@ class FilterScreen(ModalScreen[set[str] | None]):
         elif key == "space":
             event.stop()
             self._toggle_current()
-        elif key == "t":
+        elif key == "g":
             event.stop()
             self._toggle_group()
