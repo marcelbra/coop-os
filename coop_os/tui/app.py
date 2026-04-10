@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import signal
+import time
 import types
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +16,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.css.query import NoMatches
 from textual.events import Paste
+from textual.timer import Timer
 from textual.widgets import Tree
 
 from coop_os.backend.models import (
@@ -33,6 +35,7 @@ from coop_os.tui.nav import ContentNav, FileNav, Nav, StructuralNav, nav_from_pa
 from coop_os.tui.session import SessionState, load_session, save_session
 from coop_os.tui.state import StateManager
 from coop_os.tui.styles import CSS as APP_CSS
+from coop_os.tui.watcher import FileSnapshot
 from coop_os.tui.widgets import (
     ContentPanel,
     DetailTextArea,
@@ -77,6 +80,16 @@ class CoopOSApp(ActionsMixin, App[None]):
         store = ProjectStore(root)
         self.sm = StateManager(store, root)
         self.selected: Nav | None = StructuralNav("section", "roles")
+        self._file_snapshot: FileSnapshot = FileSnapshot([
+            root / "coop_os" / "workspace",
+            root / "coop_os" / "user",
+            root / "coop_os" / "agent",
+        ])
+        self._pending_reload: bool = False
+        self._last_change_at: float = 0.0
+        self._pending_changes: set[str] = set()
+        self._disk_change_warned: bool = False
+        self._watcher_timer: Timer | None = None
 
     # ── Layout ────────────────────────────────────────────────────────────────
 
@@ -100,6 +113,8 @@ class CoopOSApp(ActionsMixin, App[None]):
         self._update_right_hints()
         for sig in (signal.SIGHUP, signal.SIGTERM):
             signal.signal(sig, self._on_termination_signal)
+        self._file_snapshot.build()
+        self._watcher_timer = self.set_interval(1.0, self._on_watch_tick, name="file-watcher")
 
     def _on_termination_signal(self, signum: int, frame: types.FrameType | None) -> None:
         self._save_session()
@@ -288,6 +303,7 @@ class CoopOSApp(ActionsMixin, App[None]):
         self._save_current()
 
     def _exit_edit_mode(self) -> None:
+        self._disk_change_warned = False
         self._save_current()
         content = self.query_one(ContentPanel)
         content.remove_class("-editing")
@@ -391,6 +407,7 @@ class CoopOSApp(ActionsMixin, App[None]):
             return
         try:
             path.write_text(content.editor_text, encoding="utf-8")
+            self._file_snapshot.mark_written(path)
             self._sync_state()
         except Exception as e:
             self.notify(str(e), severity="error", timeout=4)
@@ -493,6 +510,52 @@ class CoopOSApp(ActionsMixin, App[None]):
         while (task_dir / f"{stem}-{counter}{suffix}").exists():
             counter += 1
         return f"{stem}-{counter}{suffix}"
+
+    # ── File watcher ──────────────────────────────────────────────────────────
+
+    def _on_watch_tick(self) -> None:
+        """Poll for external file changes once per second.
+
+        Debounces bursts of changes (e.g. the AI agent writing many files in
+        quick succession) by waiting 0.5 s of quiet before acting, so a rapid
+        sequence of writes produces a single reload rather than many.
+        """
+        try:
+            changed = self._file_snapshot.scan()
+            if changed:
+                self._pending_reload = True
+                self._last_change_at = time.monotonic()
+                self._pending_changes |= changed
+            if self._pending_reload and time.monotonic() - self._last_change_at >= 0.5:
+                self._pending_reload = False
+                self._handle_external_change(self._pending_changes)
+                self._pending_changes = set()
+        except Exception as exc:
+            self.notify(f"File watcher error: {exc}", severity="error", timeout=10)
+
+    def _handle_external_change(self, changed_paths: set[str]) -> None:
+        """React to external file changes detected by the watcher.
+
+        Cases:
+        - User is editing the exact file that changed (Case B): show a one-time
+          warning toast and do NOT reload, so their edits are not lost.
+        - Otherwise (Cases A and C): reload silently. This covers both the
+          not-editing case and the editing-a-different-file case — _reload()
+          already preserves focus and edit state in both scenarios.
+        """
+        content = self.query_one(ContentPanel)
+        if content.is_editing:
+            editing_path = self._item_path()
+            if editing_path and str(editing_path) in changed_paths:
+                if not self._disk_change_warned:
+                    self._disk_change_warned = True
+                    self.notify(
+                        f"'{editing_path.name}' changed on disk — your edits take priority. Ctrl+R to reload.",
+                        severity="warning",
+                        timeout=8.0,
+                    )
+                return
+        self._reload()
 
     # ── Misc ──────────────────────────────────────────────────────────────────
 
