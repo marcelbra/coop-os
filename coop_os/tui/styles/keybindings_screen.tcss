@@ -1,0 +1,28 @@
+KeybindingsScreen {
+    align: center middle;
+}
+KeybindingsScreen > #dialog {
+    width: 52;
+    height: auto;
+    background: #161b22;
+    border: heavy #30363d;
+    padding: 1 2;
+}
+KeybindingsScreen #kb-title {
+    width: 1fr;
+    color: #58a6ff;
+    margin-bottom: 1;
+}
+KeybindingsScreen .kb-section {
+    color: #484f58;
+    margin-top: 1;
+    height: 1;
+}
+KeybindingsScreen .kb-row {
+    color: #c9d1d9;
+    height: 1;
+}
+KeybindingsScreen #kb-hint {
+    color: #6e7681;
+    margin-top: 1;
+}

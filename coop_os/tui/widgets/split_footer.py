@@ -7,7 +7,7 @@ from textual.widgets import Static
 
 
 class SplitFooter(Widget):
-    """Custom footer split 50/50: contextual hints left, filter shortcuts right."""
+    """Footer with three zones: contextual hints (nav-width), k-keys at the divider, filters right."""
 
     DEFAULT_CSS = """
 SplitFooter {
@@ -17,9 +17,15 @@ SplitFooter {
     background: $panel;
 }
 SplitFooter #sf-left {
-    width: 1fr;
+    width: 30;
     height: 1;
     padding: 0 1;
+    content-align: left middle;
+}
+SplitFooter #sf-keys {
+    width: auto;
+    height: 1;
+    padding: 0 2;
     content-align: left middle;
 }
 SplitFooter #sf-right {
@@ -39,6 +45,7 @@ SplitFooter #sf-right {
 
     def compose(self) -> ComposeResult:
         yield Static(Text(), id="sf-left")
+        yield Static(self._hint("k", "keys"), id="sf-keys")
         yield Static(Text(), id="sf-right")
 
     @staticmethod

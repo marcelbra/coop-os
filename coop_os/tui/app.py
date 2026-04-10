@@ -28,6 +28,7 @@ from coop_os.backend.models import (
 )
 from coop_os.backend.store import ProjectStore
 from coop_os.tui.actions import ActionsMixin
+from coop_os.tui.keybindings_screen import KeybindingsScreen
 from coop_os.tui.nav import ContentNav, FileNav, Nav, StructuralNav, nav_from_parts, nav_to_parts
 from coop_os.tui.session import SessionState, load_session, save_session
 from coop_os.tui.state import StateManager
@@ -67,6 +68,7 @@ class CoopOSApp(ActionsMixin, App[None]):
         Binding("ctrl+n", "new_subtask", "new subtask", show=False),
         Binding("d", "delete_item", "delete", show=False),
         Binding("ctrl+r", "refresh_state", "Refresh", show=False),
+        Binding("k", "show_keybindings", "keys", show=False),
     ]
 
     def __init__(self, root: Path) -> None:
@@ -497,3 +499,6 @@ class CoopOSApp(ActionsMixin, App[None]):
     def action_refresh_state(self) -> None:
         self._reload()
         self.notify("Refreshed", severity="information", timeout=2)
+
+    def action_show_keybindings(self) -> None:
+        self.push_screen(KeybindingsScreen())
