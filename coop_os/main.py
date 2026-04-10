@@ -22,8 +22,10 @@ def _cmd_validate(root: Path) -> None:
             print(f"  Error: {err.error}\n")
         sys.exit(1)
     else:
-        r, m, t, c = len(state.roles), len(state.milestones), len(state.tasks), len(state.contexts)
-        print(f"OK — {r} roles, {m} milestones, {t} tasks, {c} contexts parsed successfully.")
+        print(
+            f"OK — {len(state.roles)} roles, {len(state.milestones)} milestones, "
+            f"{len(state.tasks)} tasks, {len(state.contexts)} contexts parsed successfully."
+        )
 
 
 def main() -> None:
