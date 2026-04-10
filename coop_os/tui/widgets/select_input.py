@@ -70,49 +70,55 @@ class SelectInput(Widget):
         self.styles.height = 1
         self.refresh()
 
-    def on_key(self, event: Key) -> None:  # noqa: C901
+    def _handle_closed_key(self, event: Key) -> None:
+        if event.key == "enter":
+            event.prevent_default()
+            event.stop()
+            if self._options:
+                self._open_dropdown()
+        elif event.key == "up":
+            event.prevent_default()
+            event.stop()
+            self.post_message(FieldInput.Navigate(-1))
+        elif event.key == "down":
+            event.prevent_default()
+            event.stop()
+            self.post_message(FieldInput.Navigate(+1))
+        elif event.key == "left":
+            event.prevent_default()
+            event.stop()
+            self.post_message(DetailTextArea.ExitRequested())
+
+    def _handle_open_key(self, event: Key) -> None:
+        if event.key == "up":
+            event.prevent_default()
+            event.stop()
+            self._cursor = max(0, self._cursor - 1)
+            self.refresh()
+        elif event.key == "down":
+            event.prevent_default()
+            event.stop()
+            self._cursor = min(len(self._options) - 1, self._cursor + 1)
+            self.refresh()
+        elif event.key == "enter":
+            event.prevent_default()
+            event.stop()
+            if self._options:
+                self._value = self._options[self._cursor]
+            self._close_dropdown()
+            self.post_message(SelectInput.ValueSelected())
+        elif event.key in ("escape", "left"):
+            event.prevent_default()
+            event.stop()
+            self._close_dropdown()
+
+    def on_key(self, event: Key) -> None:
         if self.disabled:
             return
-        if not self._open:
-            if event.key == "enter":
-                event.prevent_default()
-                event.stop()
-                if self._options:
-                    self._open_dropdown()
-            elif event.key == "up":
-                event.prevent_default()
-                event.stop()
-                self.post_message(FieldInput.Navigate(-1))
-            elif event.key == "down":
-                event.prevent_default()
-                event.stop()
-                self.post_message(FieldInput.Navigate(+1))
-            elif event.key == "left":
-                event.prevent_default()
-                event.stop()
-                self.post_message(DetailTextArea.ExitRequested())
+        if self._open:
+            self._handle_open_key(event)
         else:
-            if event.key == "up":
-                event.prevent_default()
-                event.stop()
-                self._cursor = max(0, self._cursor - 1)
-                self.refresh()
-            elif event.key == "down":
-                event.prevent_default()
-                event.stop()
-                self._cursor = min(len(self._options) - 1, self._cursor + 1)
-                self.refresh()
-            elif event.key == "enter":
-                event.prevent_default()
-                event.stop()
-                if self._options:
-                    self._value = self._options[self._cursor]
-                self._close_dropdown()
-                self.post_message(SelectInput.ValueSelected())
-            elif event.key in ("escape", "left"):
-                event.prevent_default()
-                event.stop()
-                self._close_dropdown()
+            self._handle_closed_key(event)
 
     def on_blur(self) -> None:
         if self._open:
