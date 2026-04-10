@@ -1,4 +1,6 @@
-.PHONY: install lint format fix run test check
+.PHONY: install lint format fix run test check sync-worktree seed-workspace
+
+MAIN_REPO := $(shell git worktree list | head -1 | awk '{print $$1}')
 
 install:  ## Install project dependencies
 	uv sync --group dev
@@ -20,8 +22,15 @@ test:  ## Run the test suite
 
 check: lint test  ## Run lint and tests (CI)
 
+sync-worktree:  ## Copy gitignored workspace/user state from the main worktree into this one
+	cp -r $(MAIN_REPO)/coop_os/workspace coop_os/
+	cp -r $(MAIN_REPO)/coop_os/user coop_os/
+
 run:  ## Start the TUI
 	uv run coop-os start
+
+seed-workspace:  ## Seed workspace with demo data (5 roles, 16 milestones, 30 tasks)
+	uv run scripts/seed_workspace.py
 
 help:  ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'

@@ -22,7 +22,7 @@ Two long-lived branches:
 ### Day-to-day: feature → develop
 
 1. **Before starting any work**, ask the user: "Do you want to work in a worktree (isolated) or directly on the project?" Wait for their answer before proceeding.
-2. If worktree: call `EnterWorktree` with the branch name (following naming conventions above) — this creates an isolated worktree. If direct: create and check out the branch manually with `git checkout -b <branch> origin/develop`.
+2. If worktree: call `EnterWorktree` with the branch name (following naming conventions above) — this creates an isolated worktree, then immediately run `make sync-worktree` to copy gitignored workspace/user state from the main worktree. If direct: create and check out the branch manually with `git checkout -b <branch> origin/develop`.
 3. Make focused, atomic commits
 4. If in a worktree: call `ExitWorktree` after committing — it cleans up automatically. Then push to `origin`. If direct: push to `origin`: `git push origin <branch>`.
 5. Open PR against `develop` on `marcelbra/coop-os`:
@@ -62,7 +62,7 @@ When `develop` is stable and ready to ship:
 **Always wait for CI before merging.** After creating a PR, run `gh pr checks <n> --repo marcelbra/coop-os --watch` and wait for all checks to pass. Only then merge with `--admin`. Never merge while checks are failing or pending.
 
 **Always ask the user to review and test before committing.** After implementing:
-1. Explain what changed, , concisely
+1. Show what changed
 2. Run `make check` — if it passes, prompt the user to test
 3. Give them the exact commands to run in a new terminal window, as two lines:
    ```
@@ -79,6 +79,36 @@ Only after confirmation: commit, push, open the PR, and merge — all in one uni
 ### What belongs in separate PRs
 
 Split into distinct PRs when changes touch different concerns (e.g. a feature in one file and a bug fix in another, or code changes vs. docs/skills cleanup). Combine when changes are tightly coupled and make no sense apart.
+
+## GitHub Accounts
+
+Two accounts are configured via SSH host aliases:
+
+| Alias | Account | Email |
+|-------|---------|-------|
+| `github-personal` | marcelbra | marcelbraasch@gmail.com |
+| `github-work` | marcel-braasch_kpn | marcel.braasch@kpn.com |
+
+**Check which account a repo is using:**
+```
+git remote get-url origin
+```
+The alias in the URL (`github-personal` or `github-work`) tells you which account will be used.
+
+**Switch a repo to a different account:**
+```
+git remote set-url origin git@github-personal:marcelbra/repo.git
+# or
+git remote set-url origin git@github-work:workorg/repo.git
+```
+
+**When cloning**, always replace `github.com` with the right alias:
+```
+git clone git@github-personal:marcelbra/repo.git
+git clone git@github-work:workorg/repo.git
+```
+
+This repo uses `github-personal`. The `gh` CLI manages its own auth separately and is already configured with both accounts.
 
 ## Development Commands
 
