@@ -1,29 +1,27 @@
 ---
-description: Weekly review workflow. Best done Sunday evening or Friday afternoon.
-  Covers task progress, habits, goal tracking, and next-week planning.
+description: Weekly review workflow. Best done Sunday evening or Friday afternoon. Covers task progress, habits, goal tracking, and next-week planning.
 name: weekly-review
 ---
 
 ## Steps
 
-1. **Task overview**
-   - Read all task files in `tasks/`
-   - What got done this week? What's been sitting untouched?
-   - Flag anything completed that should be archived
+1. **Review the week**
+   - Which tasks moved to `done` this week?
+   - Which stalled or were deferred? Why?
+   - Any milestones completed or significantly advanced?
 
-2. **Habits check**
-   - Ask the user to self-report: which recurring commitments hit, which missed?
-   - No judgment — just data, look for patterns
+2. **Check habits**
+   - Review `recurring-habits.md` — which habits hit target frequency?
+   - Note wins and misses without judgment
 
-3. **Goals progress**
-   - Review milestone files in `milestones/`
-   - Flag any that haven't moved in 2+ weeks: still relevant, or archive?
+3. **Check milestone health**
+   - Any milestones with no progress this week?
+   - Anything stalling that needs a decision or action?
 
 4. **Plan next week**
-   - Check calendar for the coming week
-   - Agree on top 3 focus areas (not tasks — areas)
-   - Set or adjust priorities on relevant tasks
+   - What are the 3–5 most important things next week?
+   - Block time for deep work if needed
 
-5. **Close the review**
-   - One honest paragraph: what the week actually looked like vs. intention
-   - What's the one thing to protect next week?
+5. **Capture reflections**
+   - What went well? What would you change?
+   - Any patterns worth noting?

@@ -1,6 +1,5 @@
 ---
-description: Daily morning check-in. Reviews calendar, email, and active tasks to
-  surface the top 3 priorities and the single most important thing for the day.
+description: Daily morning check-in. Reviews calendar, email, and active tasks to surface the top 3 priorities and the single most important thing for the day.
 name: check-in
 ---
 
@@ -15,7 +14,7 @@ name: check-in
    - Only surface what matters — don't summarize everything
 
 3. **Check tasks**
-   - Read task files in `tasks/` with status `in-progress`
+   - Read task files in `tasks/` with status `in_progress`
    - Read task files in `tasks/` with status `todo`
    - Identify what's overdue, what's closest to done, what aligns with today's energy
 

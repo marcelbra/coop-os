@@ -1,6 +1,5 @@
 ---
-description: Process unscanned notes into tasks and milestones. Reads notes with scanned:false
-  frontmatter, proposes actions, and marks them as processed.
+description: Process unscanned notes into tasks and milestones. Reads notes with scanned:false frontmatter, proposes actions, and marks them as processed.
 name: scan-notes
 ---
 
@@ -21,9 +20,8 @@ name: scan-notes
    - Ask: "Do these look right? Anything to skip or change?"
 
 4. **Execute approved actions**
-   - Create tasks / milestones as confirmed
-   - Tasks: use `tasks/template.md`, place at `tasks/{next_id}-{slug}/description.md`
-   - Milestones: use `milestones/template.md`, place at `milestones/{next_id}-{slug}.md`
+   - Create tasks: place at `tasks/{next_id}-{title}/description.md`
+   - Create milestones: place at `milestones/{next_id}-{title}.md`
 
 5. **Mark notes as scanned**
    - Set `scanned: true` in the frontmatter of each processed note file

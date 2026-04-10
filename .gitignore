@@ -27,3 +27,6 @@ coop_os/workspace/milestones/*
 coop_os/user/notes/*
 coop_os/user/context/*
 coop_os/workspace/tasks/*
+
+# Local specs (not tracked)
+specs/

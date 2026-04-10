@@ -19,7 +19,7 @@ You operate on the coop-os file system. Read and write files according to the st
 |------|----------|
 | `coop_os/workspace/roles/` | One file per life role |
 | `coop_os/workspace/milestones/` | Active and completed milestones |
-| `coop_os/workspace/tasks/` | Task folders — `{id}-{slug}/description.md` each |
+| `coop_os/workspace/tasks/` | Task folders — `{id}-{title}/description.md` each |
 | `coop_os/user/notes/` | Raw notes pending review |
 | `coop_os/user/context/` | Personal context documents |
 | `coop_os/agent/skills/` | Skill definitions — what this agent can do |
@@ -36,7 +36,7 @@ Skills live in `coop_os/agent/skills/`. Invoke the relevant skill when the user'
 | `check-out` | User wants to wrap up the day, review progress, or plan tomorrow |
 | `weekly-review` | User wants a full week retrospective or to plan the coming week |
 | `scan-notes` | User wants to process raw notes into tasks or milestones |
-| `workspace-setup` | Workspace directories are empty or user wants to import existing context into the hierarchy |
+| `workspace-setup` | Workspace directories are empty or user wants to import existing context |
 
 ---
 
