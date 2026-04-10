@@ -266,19 +266,13 @@ class NavTree(Tree[Nav | None]):
             t.append(" ·", style="#58a6ff")
         return t
 
-    def _build_workspaces(
+    def _add_roles_section(
         self,
-        state: ProjectState,
         expanded: set[str],
-        expanded_tasks: set[str],
-        expanded_dirs: set[str],
+        state: ProjectState,
         cfg: AppConfig,
         role_filters: set[str],
-        milestone_filters: set[str],
-        task_filters: set[str],
-        task_dirs: dict[str, Path],
         visible_role_ids: set[str],
-        visible_milestone_ids: set[str],
     ) -> None:
         visible_roles = [r for r in state.roles if not role_filters or r.id in visible_role_ids]
         roles_expand = "roles" in expanded and bool(visible_roles)
@@ -293,6 +287,15 @@ class NavTree(Tree[Nav | None]):
                 data=ContentNav("role", r.id, "roles"),
             )
 
+    def _add_milestones_section(
+        self,
+        expanded: set[str],
+        state: ProjectState,
+        cfg: AppConfig,
+        role_filters: set[str],
+        milestone_filters: set[str],
+        visible_milestone_ids: set[str],
+    ) -> None:
         ms_filter_active = bool(role_filters or milestone_filters)
         visible_milestones = [
             m for m in state.milestones
@@ -310,7 +313,17 @@ class NavTree(Tree[Nav | None]):
                 data=ContentNav("milestone", m.id, "milestones"),
             )
 
-        ms_ids_for_tasks = visible_milestone_ids if ms_filter_active else None
+    def _add_tasks_section(
+        self,
+        expanded: set[str],
+        state: ProjectState,
+        cfg: AppConfig,
+        task_filters: set[str],
+        expanded_tasks: set[str],
+        expanded_dirs: set[str],
+        task_dirs: dict[str, Path],
+        ms_ids_for_tasks: set[str] | None,
+    ) -> None:
         has_visible_tasks = any(
             t for t in state.tasks
             if t.parent is None
@@ -326,6 +339,31 @@ class NavTree(Tree[Nav | None]):
         self._add_task_nodes(
             tasks_node, state.tasks, None, cfg, expanded_tasks, task_filters, task_dirs, expanded_dirs,
             ms_ids_for_tasks,
+        )
+
+    def _build_workspaces(
+        self,
+        state: ProjectState,
+        expanded: set[str],
+        expanded_tasks: set[str],
+        expanded_dirs: set[str],
+        cfg: AppConfig,
+        role_filters: set[str],
+        milestone_filters: set[str],
+        task_filters: set[str],
+        task_dirs: dict[str, Path],
+        visible_role_ids: set[str],
+        visible_milestone_ids: set[str],
+    ) -> None:
+        ms_ids_for_tasks: set[str] | None = (
+            visible_milestone_ids if bool(role_filters or milestone_filters) else None
+        )
+        self._add_roles_section(expanded, state, cfg, role_filters, visible_role_ids)
+        self._add_milestones_section(
+            expanded, state, cfg, role_filters, milestone_filters, visible_milestone_ids
+        )
+        self._add_tasks_section(
+            expanded, state, cfg, task_filters, expanded_tasks, expanded_dirs, task_dirs, ms_ids_for_tasks
         )
 
     def populate(
@@ -415,9 +453,13 @@ class NavTree(Tree[Nav | None]):
         _sep()
 
     def _visible_nodes(self) -> list[TreeNode[Nav | None]]:
-        return [line.node for line in self._tree_lines]
+        return [tree_line.node for tree_line in self._tree_lines]
 
     def _snapshot_visible_order(self) -> dict[tuple[str, str], list[str]]:
+        """Capture the current visible node order as dict[(kind, section) → [id, ...]].
+
+        Used before a tree rebuild to enable post-rebuild focus restoration.
+        """
         order: dict[tuple[str, str], list[str]] = {}
         for node in self._visible_nodes():
             nav = node.data
@@ -544,6 +586,12 @@ class NavTree(Tree[Nav | None]):
         expanded_dirs: set[str],
         visible_milestone_ids: set[str] | None = None,
     ) -> None:
+        """Recursively add task nodes to the tree.
+
+        Filtering contract: status filter applies at all levels; milestone filter only
+        applies to top-level tasks (parent_id is None); subtasks are always shown if
+        their parent passes the filter.
+        """
         children = [t for t in all_tasks if t.parent == parent_id]
         for t in children:
             if task_filters and t.status not in task_filters:
