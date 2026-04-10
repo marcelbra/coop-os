@@ -94,7 +94,9 @@ class StructuredEditor(Widget):
                     sel.set_options(options, display)
                     sel.value = val
                 else:
-                    cast(FieldInput, widget).value = val
+                    fi = cast(FieldInput, widget)
+                    fi.value = val
+                    fi.cursor_position = 0
 
         has_visible_fields = any(kind in kinds for _, _, kinds, _ in FIELD_DEFS)
         self.query_one("#se-sep", Rule).display = has_visible_fields
@@ -227,7 +229,8 @@ class StructuredEditor(Widget):
             if self._kind not in kinds:
                 continue
             widget = self.query_one(f"#se-inp-{attr_key}")
-            val_str = cast(FieldInput, widget).value.strip()
+            fi = cast(FieldInput, widget)
+            val_str = fi.value.strip()
             if attr_key == "scanned":
                 meta[attr_key] = val_str.lower() in ("true", "yes", "1")
             else:

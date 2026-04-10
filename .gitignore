@@ -15,7 +15,8 @@ Thumbs.db
 # Editors / tools
 .vscode/
 .idea/
-.claude/
+.claude/*
+!.claude/settings.json
 
 # Personal data (not tracked)
 coop_os/workspace/roles/*

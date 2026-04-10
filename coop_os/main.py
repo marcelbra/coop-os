@@ -1,9 +1,29 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
+from coop_os.backend.store import ProjectStore
 from coop_os.tui import CoopOSApp
+
+
+def _cmd_start(root: Path) -> None:
+    CoopOSApp(root=root).run()
+
+
+def _cmd_validate(root: Path) -> None:
+    store = ProjectStore(root)
+    state = store.load()
+    if state.errors:
+        print(f"Found {len(state.errors)} parse error(s):\n")
+        for err in state.errors:
+            print(f"  File:  {err.file}")
+            print(f"  Error: {err.error}\n")
+        sys.exit(1)
+    else:
+        r, m, t, c = len(state.roles), len(state.milestones), len(state.tasks), len(state.contexts)
+        print(f"OK — {r} roles, {m} milestones, {t} tasks, {c} contexts parsed successfully.")
 
 
 def main() -> None:
@@ -14,10 +34,18 @@ def main() -> None:
     start.add_argument("--root", type=Path, default=Path.cwd(),
                        help="Project root directory (default: cwd)")
 
-    args = p.parse_args()
+    validate = sub.add_parser("validate", help="Parse all workspace files and report errors")
+    validate.add_argument("--root", type=Path, default=Path.cwd(),
+                          help="Project root directory (default: cwd)")
 
-    if args.cmd == "start":
-        CoopOSApp(root=args.root.resolve()).run()
+    args = p.parse_args()
+    cmd: str | None = args.cmd
+    root: Path = getattr(args, "root", Path.cwd())
+
+    if cmd == "start":
+        _cmd_start(root.resolve())
+    elif cmd == "validate":
+        _cmd_validate(root.resolve())
     else:
         p.print_help()
 

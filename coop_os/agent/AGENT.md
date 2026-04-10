@@ -28,12 +28,15 @@ You operate on the coop-os file system. Read and write files according to the st
 
 ## Skills
 
-| Command | Description |
-|---------|-------------|
-| `/check-in` | Start-of-day context load and prioritization |
-| `/check-out` | End-of-day review, task updates, tomorrow preview |
-| `/weekly-review` | Full week retrospective and next-week planning |
-| `/scan-notes` | Process unscanned notes into tasks, milestones, or context updates |
+Skills live in `coop_os/agent/skills/`. Invoke the relevant skill when the user's request matches.
+
+| Skill | When to use |
+|-------|-------------|
+| `check-in` | User wants to start their day, review priorities, or get a morning briefing |
+| `check-out` | User wants to wrap up the day, review progress, or plan tomorrow |
+| `weekly-review` | User wants a full week retrospective or to plan the coming week |
+| `scan-notes` | User wants to process raw notes into tasks or milestones |
+| `workspace-setup` | Workspace directories are empty or user wants to import existing context into the hierarchy |
 
 ---
 

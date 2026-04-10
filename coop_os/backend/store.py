@@ -367,22 +367,48 @@ class ContextStore(FlatFileStore[Context]):
         return item.title
 
 
-class SkillStore(FlatFileStore[Skill]):
+class SkillStore:
     def __init__(self, root: Path) -> None:
-        super().__init__(root, "agent/skills", "skill", label="coop_os/agent/skills")
+        self._dir = root / "coop_os" / "agent" / "skills"
 
-    def _parse(self, meta: dict[str, Any], content: str) -> Skill:
-        return Skill(
-            id=str(meta["id"]),
-            command=str(meta["command"]),
-            content=content,
-        )
+    def load_all(self) -> tuple[list[Skill], list[ParseError]]:
+        items: list[Skill] = []
+        errors: list[ParseError] = []
+        if not self._dir.exists():
+            return items, errors
+        for path in sorted(self._dir.glob("*/SKILL.md")):
+            try:
+                meta, content = _read_fm(path)
+                items.append(Skill(
+                    name=str(meta["name"]),
+                    description=str(meta.get("description", "")),
+                    content=content,
+                ))
+            except Exception as e:
+                errors.append(ParseError(file=f"coop_os/agent/skills/{path.parent.name}/SKILL.md", error=str(e)))
+        return items, errors
 
-    def _to_meta_content(self, item: Skill) -> tuple[dict[str, Any], str]:
-        return {"id": item.id, "command": item.command}, item.content
+    def save(self, item: Skill) -> None:
+        skill_dir = self._dir / item.name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        _write_fm(skill_dir / "SKILL.md", {"name": item.name, "description": item.description}, item.content)
 
-    def _file_slug(self, item: Skill) -> str:
-        return item.command
+    def find_path(self, item_id: str) -> Path | None:
+        path = self._dir / item_id / "SKILL.md"
+        return path if path.exists() else None
+
+    def next_new_name(self) -> str:
+        n = 1
+        while (self._dir / f"new-skill-{n}").exists():
+            n += 1
+        return f"new-skill-{n}"
+
+    def delete(self, item_id: str) -> bool:
+        skill_dir = self._dir / item_id
+        if skill_dir.exists():
+            shutil.rmtree(skill_dir)
+            return True
+        return False
 
 
 # ── Project store ─────────────────────────────────────────────────────────────

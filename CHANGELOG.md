@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-04-10
+
+### Added
+- `coop-os validate` command and PostToolUse hook integration
+- Filter roles and milestones by name in addition to status
+- Skills converted to universal SKILL.md format
+
+### Fixed
+- Status section header and toggle-dismiss keybindings on filter screen
+
+### Refactored
+- TUI nav/filter overhaul — cursor preservation, fallback logic, and nav kind guards
+- Decoupled SkillStore from FlatFileStore; aligned Skill model with skills spec
+
 ## [0.3.0] - 2026-04-08
 
 ### Added

@@ -1,6 +1,7 @@
 ---
-id: skill-1
-command: /check-in
+description: Daily morning check-in. Reviews calendar, email, and active tasks to
+  surface the top 3 priorities and the single most important thing for the day.
+name: check-in
 ---
 
 ## Steps

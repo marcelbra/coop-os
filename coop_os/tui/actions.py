@@ -20,7 +20,7 @@ from coop_os.backend.models import (
 )
 from coop_os.tui.confirm_delete import ConfirmDeleteScreen
 from coop_os.tui.filter_screen import FilterScreen
-from coop_os.tui.nav import Nav
+from coop_os.tui.nav import Nav, choose_same_section_neighbor
 from coop_os.tui.widgets import ContentPanel, NavTree
 
 if TYPE_CHECKING:
@@ -67,6 +67,8 @@ class _CoopOSHost(_HostBase):
         status_enum: type[RoleStatus | MilestoneStatus | TaskStatus],
         current: set[str],
         attr: str,
+        name_options: list[tuple[str, str]] | None = None,
+        dismiss_key: str | None = None,
     ) -> None: ...
 
 class ActionsMixin(_CoopOSHost):
@@ -74,6 +76,10 @@ class ActionsMixin(_CoopOSHost):
 
     Extracted to keep app.py focused on layout, state, and event wiring.
     """
+
+    def next_nav_after_delete(self: _CoopOSHost, nav: Nav) -> Nav:
+        """Public wrapper for the delete-focus policy."""
+        return self._next_nav_after_delete(nav)
 
     # ── Create / Delete ───────────────────────────────────────────────────────
 
@@ -131,10 +137,8 @@ class ActionsMixin(_CoopOSHost):
                 self.sm.store.contexts.save(new_item)
                 kind = "context"
             case "skills":
-                new_item = Skill(
-                    id=self.sm.store.skills.next_id(),
-                    command="new-skill",
-                )
+                slug = self.sm.store.skills.next_new_name()
+                new_item = Skill(name=slug)
                 self.sm.store.skills.save(new_item)
                 kind = "skill"
             case _:
@@ -190,27 +194,30 @@ class ActionsMixin(_CoopOSHost):
         """Return the Nav to focus after a task_file or task_dir is deleted."""
         tree = self.query_one(NavTree)
         for node in tree.iter_all_nodes(tree.root):
-            if not (isinstance(node.data, Nav) and node.data.id == nav.id and node.data.kind == nav.kind):
+            data = node.data
+            if data is None or not (data.id == nav.id and data.kind == nav.kind):
                 continue
             parent_node = node.parent
             if parent_node is None:
                 break
             siblings = [
                 n for n in parent_node.children
-                if isinstance(n.data, Nav) and n.data.kind in ("task_file", "task_dir")
+                if n.data is not None and n.data.kind in ("task_file", "task_dir")
             ]
-            idx = next((i for i, n in enumerate(siblings) if isinstance(n.data, Nav) and n.data.id == nav.id), None)
+            idx = next((i for i, n in enumerate(siblings) if n.data is not None and n.data.id == nav.id), None)
             if idx is None:
                 break
             if idx + 1 < len(siblings):
-                d = siblings[idx + 1].data
-                return d if isinstance(d, Nav) else Nav("section", "", "tasks")
+                sibling_data = siblings[idx + 1].data
+                assert sibling_data is not None
+                return sibling_data
             if idx > 0:
-                d = siblings[idx - 1].data
-                return d if isinstance(d, Nav) else Nav("section", "", "tasks")
+                sibling_data = siblings[idx - 1].data
+                assert sibling_data is not None
+                return sibling_data
             # Last child — go to parent; tree rebuild will close it if empty
             parent_data = parent_node.data
-            if isinstance(parent_data, Nav) and parent_data.kind in ("task", "task_dir"):
+            if parent_data is not None and parent_data.kind in ("task", "task_dir"):
                 return parent_data
             break
         return Nav("section", "", "tasks")
@@ -232,15 +239,18 @@ class ActionsMixin(_CoopOSHost):
         else:
             tree = self.query_one(NavTree)
             section_leaves = [
-                node.data
+                data
                 for node in tree.iter_all_nodes(tree.root)
-                if isinstance(node.data, Nav)
-                and node.data.kind == nav.kind
-                and node.data.section == nav.section
+                if (data := node.data) is not None
+                and data.kind == nav.kind
+                and data.section == nav.section
             ]
-            idx = next((i for i, n in enumerate(section_leaves) if n.id == nav.id), None)
-            if idx is not None and len(section_leaves) > 1:
-                sibling = section_leaves[idx + 1] if idx + 1 < len(section_leaves) else section_leaves[idx - 1]
+            sibling = choose_same_section_neighbor(
+                nav,
+                [candidate.id for candidate in section_leaves],
+                [candidate for candidate in section_leaves if candidate.id != nav.id],
+            )
+            if sibling is not None:
                 return sibling
         return Nav("section", "", nav.section)
 
@@ -280,24 +290,43 @@ class ActionsMixin(_CoopOSHost):
         status_enum: type[RoleStatus | MilestoneStatus | TaskStatus],
         current: set[str],
         attr: str,
+        name_options: list[tuple[str, str]] | None = None,
+        dismiss_key: str | None = None,
     ) -> None:
         if self.query_one(ContentPanel).is_editing:
             return
-        options = [(s.value, s.value.replace("_", " ").title()) for s in status_enum]
-        result = await self.push_screen_wait(FilterScreen(title, options, current))
+        status_opts: list[tuple[str, str]] = [(s.value, s.value.replace("_", " ").title()) for s in status_enum]
+        if name_options:
+            options: list[tuple[str, str]] = (
+                [("", "── Statuses ──")] + status_opts + [("", "── Names ──")] + name_options
+            )
+        else:
+            options = status_opts
+        result = await self.push_screen_wait(FilterScreen(title, options, current, dismiss_key=dismiss_key))
         if result is not None:
             setattr(self.sm, attr, result)
+            self.sm.prune_downstream_filters()
             self._reload()
             self._update_right_hints()
 
     @work
     async def action_filter_roles(self: _CoopOSHost) -> None:
-        await self._open_filter("Filter Roles", RoleStatus, self.sm.role_filters, "role_filters")
+        role_opts = [(r.id, r.title) for r in self.sm.state.roles] if self.sm.state else []
+        await self._open_filter(
+            "Filter Roles", RoleStatus, self.sm.role_filters, "role_filters", role_opts, dismiss_key="r"
+        )
 
     @work
     async def action_filter_milestones(self: _CoopOSHost) -> None:
-        await self._open_filter("Filter Milestones", MilestoneStatus, self.sm.milestone_filters, "milestone_filters")
+        if not self.sm.state:
+            return
+        visible_role_ids = self.sm.visible_role_ids()
+        ms_opts = [(m.id, m.title) for m in self.sm.milestones_in_role_scope(visible_role_ids)]
+        await self._open_filter(
+            "Filter Milestones", MilestoneStatus, self.sm.milestone_filters, "milestone_filters", ms_opts,
+            dismiss_key="m",
+        )
 
     @work
     async def action_filter_tasks(self: _CoopOSHost) -> None:
-        await self._open_filter("Filter Tasks", TaskStatus, self.sm.task_filters, "task_filters")
+        await self._open_filter("Filter Tasks", TaskStatus, self.sm.task_filters, "task_filters", dismiss_key="t")

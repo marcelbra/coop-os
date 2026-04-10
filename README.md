@@ -32,16 +32,13 @@ Collaboration welcome — see [Contributing](https://github.com/marcelbra/coop-o
 
 ## Install
 
-To run do
-
 ```bash
 pip install coop-os
+npx skills add marcelbra/coop-os
 coop-os start
 ```
 
-or
-
-for local development do
+For local development:
 
 ```bash
 make install

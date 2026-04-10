@@ -99,7 +99,7 @@ ContentPanel.-editing-struct StructuredEditor { display: block; }
 }
 
 .se-label {
-    width: 12;
+    width: 14;
     color: #6e7681;
     content-align: right middle;
     padding-right: 2;

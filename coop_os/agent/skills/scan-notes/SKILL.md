@@ -1,6 +1,7 @@
 ---
-id: skill-3
-command: /scan-notes
+description: Process unscanned notes into tasks and milestones. Reads notes with scanned:false
+  frontmatter, proposes actions, and marks them as processed.
+name: scan-notes
 ---
 
 ## Steps

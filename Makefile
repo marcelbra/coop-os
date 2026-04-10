@@ -3,6 +3,7 @@
 install:  ## Install project dependencies
 	uv sync --group dev
 	git config core.hooksPath .githooks
+	npx --yes skills add ./coop_os/agent/skills --all
 
 lint:  ## Check for linting and type errors
 	uv run ruff check coop_os

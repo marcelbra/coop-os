@@ -1,6 +1,6 @@
 [project]
 name = "coop-os"
-version = "0.3.0"
+version = "0.4.0"
 description = "Personal life OS — markdown-backed, browser UI"
 license = { file = "LICENSE" }
 requires-python = ">=3.13"

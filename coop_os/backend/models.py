@@ -24,6 +24,9 @@ class MilestoneStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+Status = type[RoleStatus] | type[MilestoneStatus] | type[TaskStatus]
+
+
 class Role(BaseModel):
     id: str
     title: str
@@ -67,9 +70,13 @@ class Context(BaseModel):
 
 
 class Skill(BaseModel):
-    id: str
-    command: str
+    name: str
+    description: str = ""
     content: str = ""
+
+    @property
+    def id(self) -> str:
+        return self.name
 
 
 class ParseError(BaseModel):

@@ -432,32 +432,24 @@ def test_context_delete(tmp_path: Path) -> None:
 def test_skill_save_and_load(tmp_path: Path) -> None:
     root = make_root(tmp_path)
     store = SkillStore(root)
-    skill = Skill(id="skill-1", command="/check-in", content="Run the check-in flow.")
+    skill = Skill(name="check-in", description="Daily morning check-in.", content="Run the check-in flow.")
     store.save(skill)
     skills, errors = store.load_all()
     assert errors == []
     assert len(skills) == 1
-    assert skills[0].id == "skill-1"
-    assert skills[0].command == "/check-in"
+    assert skills[0].name == "check-in"
+    assert skills[0].description == "Daily morning check-in."
     assert skills[0].content == "Run the check-in flow."
 
 
 def test_skill_delete(tmp_path: Path) -> None:
     root = make_root(tmp_path)
     store = SkillStore(root)
-    skill = Skill(id="skill-1", command="/foo")
+    skill = Skill(name="check-in", description="Daily morning check-in.")
     store.save(skill)
-    assert store.delete("skill-1") is True
+    assert store.delete("check-in") is True
     skills, _ = store.load_all()
     assert skills == []
-
-
-def test_skill_next_id(tmp_path: Path) -> None:
-    root = make_root(tmp_path)
-    store = SkillStore(root)
-    assert store.next_id() == "skill-1"
-    store.save(Skill(id="skill-1", command="/a"))
-    assert store.next_id() == "skill-2"
 
 
 # ── ProjectStore (integration) ────────────────────────────────────────────────
@@ -484,7 +476,7 @@ def test_project_store_load_all_types(tmp_path: Path) -> None:
     ps.tasks.save(Task(id="task-1", title="Ship it"))
     ps.notes.save(Note(id="note-1", title="Daily"))
     ps.contexts.save(Context(id="context-1", title="Spec"))
-    ps.skills.save(Skill(id="skill-1", command="/check-in"))
+    ps.skills.save(Skill(name="check-in", description="Daily morning check-in."))
 
     state = ps.load()
     assert len(state.roles) == 1
