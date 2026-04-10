@@ -74,9 +74,11 @@ class CalendarWidget(Widget):
         return weeks
 
     def _year_range(self) -> list[int]:
+        """Return the list of years [year-10 … year+10] for the year picker dropdown."""
         return list(range(self._year - 10, self._year + 11))
 
     def _init_focus(self, d: _date) -> None:
+        """Position _focus on the day-grid cell that corresponds to the given date on first render."""
         for r, week in enumerate(self._weeks()):
             for c, day in enumerate(week):
                 if day == d.day:
@@ -96,17 +98,17 @@ class CalendarWidget(Widget):
     def on_mount(self) -> None:
         self._adjust_height()
 
-    def _hl(self, text: str, active: bool) -> str:
+    def _highlight(self, text: str, active: bool) -> str:
         return f"[reverse]{text}[/reverse]" if active else text
 
     def _header_line(self) -> str:
-        f = self._focus
-        in_hdr = f[0] == "header"
-        prev = self._hl("<", in_hdr and f[1] == 0)
+        focus = self._focus
+        in_hdr = focus[0] == "header"
+        prev = self._highlight("<", in_hdr and focus[1] == 0)
         mname = self._MONTHS[self._month - 1]
-        month = self._hl(mname, in_hdr and f[1] == 1)
-        year = self._hl(str(self._year), in_hdr and f[1] == 2)
-        nxt = self._hl(">", in_hdr and f[1] == 3)
+        month = self._highlight(mname, in_hdr and focus[1] == 1)
+        year = self._highlight(str(self._year), in_hdr and focus[1] == 2)
+        nxt = self._highlight(">", in_hdr and focus[1] == 3)
         return f"{prev} {month}  {year}  {nxt}"
 
     def render(self) -> str:
@@ -119,7 +121,7 @@ class CalendarWidget(Widget):
                         cells.append("  ")
                     else:
                         txt = f"{day:2d}"
-                        cells.append(self._hl(txt, self._focus == ("day", r, c)))
+                        cells.append(self._highlight(txt, self._focus == ("day", r, c)))
                 lines.append(" ".join(cells))
             return "\n".join(lines)
 
@@ -128,7 +130,7 @@ class CalendarWidget(Widget):
             for i, m in enumerate(self._MONTHS):
                 cur = i == self._drop_cursor
                 label = f"> {m}" if cur else f"  {m}"
-                lines.append(self._hl(label, cur))
+                lines.append(self._highlight(label, cur))
             return "\n".join(lines)
 
         else:  # year
@@ -136,7 +138,7 @@ class CalendarWidget(Widget):
             for i, y in enumerate(self._year_range()):
                 cur = i == self._drop_cursor
                 label = f"> {y}" if cur else f"  {y}"
-                lines.append(self._hl(label, cur))
+                lines.append(self._highlight(label, cur))
             return "\n".join(lines)
 
     # ── Key handling ───────────────────────────────────────────────────────
@@ -149,7 +151,7 @@ class CalendarWidget(Widget):
 
     def _cal_key(self, event: Key) -> None:  # noqa: C901
         key = event.key
-        f = self._focus
+        focus = self._focus
 
         if key == "escape":
             event.prevent_default()
@@ -159,58 +161,58 @@ class CalendarWidget(Widget):
         elif key == "left":
             event.prevent_default()
             event.stop()
-            if f[0] == "header":
-                if f[1] > 0:
-                    self._focus = ("header", f[1] - 1)
+            if focus[0] == "header":
+                if focus[1] > 0:
+                    self._focus = ("header", focus[1] - 1)
                 else:
                     self.post_message(CalendarWidget.Dismissed())
                     return
-            elif f[0] == "day":
+            elif focus[0] == "day":
                 self._step_day(-1)
             self.refresh()
 
         elif key == "right":
             event.prevent_default()
             event.stop()
-            if f[0] == "header" and f[1] < 3:
-                self._focus = ("header", f[1] + 1)
-            elif f[0] == "day":
+            if focus[0] == "header" and focus[1] < 3:
+                self._focus = ("header", focus[1] + 1)
+            elif focus[0] == "day":
                 self._step_day(+1)
             self.refresh()
 
         elif key == "up":
             event.prevent_default()
             event.stop()
-            if f[0] == "day":
-                if f[1] == 0:
+            if focus[0] == "day":
+                if focus[1] == 0:
                     # Top row of days → jump to header <
                     self._focus = ("header", 0)
                 else:
-                    self._move_row(f[1] - 1, f[2])
+                    self._move_row(focus[1] - 1, focus[2])
             self.refresh()
 
         elif key == "down":
             event.prevent_default()
             event.stop()
-            if f[0] == "header":
+            if focus[0] == "header":
                 weeks = self._weeks()
                 if weeks:
                     for c, d in enumerate(weeks[0]):
                         if d is not None:
                             self._focus = ("day", 0, c)
                             break
-            elif f[0] == "day":
-                self._move_row(f[1] + 1, f[2])
+            elif focus[0] == "day":
+                self._move_row(focus[1] + 1, focus[2])
             self.refresh()
 
         elif key == "enter":
             event.prevent_default()
             event.stop()
-            if f[0] == "header":
-                self._header_action(f[1])
-            elif f[0] == "day":
+            if focus[0] == "header":
+                self._header_action(focus[1])
+            elif focus[0] == "day":
                 weeks = self._weeks()
-                day = weeks[f[1]][f[2]]
+                day = weeks[focus[1]][focus[2]]
                 if day:
                     self.post_message(
                         CalendarWidget.DateSelected(_date(self._year, self._month, day))
@@ -283,9 +285,9 @@ class CalendarWidget(Widget):
 
     def _step_day(self, delta: int) -> None:
         """Move focus one day left/right, wrapping across rows."""
-        f = self._focus
+        focus = self._focus
         weeks = self._weeks()
-        r, c = f[1], f[2]
+        r, c = focus[1], focus[2]
         while True:
             c += delta
             if c < 0:
