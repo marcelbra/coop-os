@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import signal
+import types
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -7,6 +10,7 @@ from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
+from textual.css.query import NoMatches
 from textual.widgets import Tree
 
 from coop_os.backend.models import (
@@ -20,11 +24,13 @@ from coop_os.backend.models import (
 from coop_os.backend.store import ProjectStore
 from coop_os.tui.actions import ActionsMixin
 from coop_os.tui.nav import NON_CONTENT_NAV_KINDS, Nav
+from coop_os.tui.session import SessionState, load_session, save_session
 from coop_os.tui.state import StateManager
 from coop_os.tui.styles import CSS as APP_CSS
 from coop_os.tui.widgets import (
     ContentPanel,
     DetailTextArea,
+    ExpansionState,
     FixedHeader,
     NavTree,
     SelectInput,
@@ -75,12 +81,57 @@ class CoopOSApp(ActionsMixin, App[None]):
         yield SplitFooter()
 
     def on_mount(self) -> None:
-        self._reload()
+        session = load_session(self.root)
+        self.sm.role_filters = session.role_filters
+        self.sm.milestone_filters = session.milestone_filters
+        self.sm.task_filters = session.task_filters
+        if session.selected_kind:
+            self.selected = Nav(session.selected_kind, session.selected_id, session.selected_section)
+        self._reload(initial_expansion=ExpansionState(
+            session.expanded_sections, session.expanded_tasks, session.expanded_dirs
+        ))
         self._update_right_hints()
+        for sig in (signal.SIGHUP, signal.SIGTERM):
+            signal.signal(sig, self._on_termination_signal)
+
+    def _on_termination_signal(self, signum: int, frame: types.FrameType | None) -> None:
+        self._save_session()
+        signal.signal(signum, signal.SIG_DFL)
+        os.kill(os.getpid(), signum)
+
+    def _save_session(self) -> None:
+        try:
+            tree = self.query_one(NavTree)
+            expansion = tree.expanded_state()
+            cursor_nav = self.selected
+            if cursor_nav is None:
+                cursor_node = tree.cursor_node
+                if cursor_node is not None:
+                    cursor_nav = cursor_node.data
+            sel_kind = cursor_nav.kind if cursor_nav else "section"
+            sel_id = cursor_nav.id if cursor_nav else ""
+            sel_section = cursor_nav.section if cursor_nav else "roles"
+            save_session(self.root, SessionState(
+                role_filters=self.sm.role_filters,
+                milestone_filters=self.sm.milestone_filters,
+                task_filters=self.sm.task_filters,
+                expanded_sections=expansion.sections,
+                expanded_tasks=expansion.tasks,
+                expanded_dirs=expansion.dirs,
+                selected_kind=sel_kind,
+                selected_id=sel_id,
+                selected_section=sel_section,
+            ))
+        except NoMatches:
+            pass
+
+    async def action_quit(self) -> None:
+        self._save_session()
+        await super().action_quit()
 
     # ── State ─────────────────────────────────────────────────────────────────
 
-    def _sync_state(self) -> None:
+    def _sync_state(self, initial_expansion: ExpansionState | None = None) -> None:
         """Load state from disk and repopulate the tree.
 
         This is the single authoritative sync point between disk and UI. Call it
@@ -96,9 +147,10 @@ class CoopOSApp(ActionsMixin, App[None]):
             task_dirs=self.sm.task_dirs(),
             visible_role_ids=visible_role_ids,
             visible_milestone_ids=visible_milestone_ids,
+            initial_expansion=initial_expansion,
         )
 
-    def _reload(self) -> None:
+    def _reload(self, initial_expansion: ExpansionState | None = None) -> None:
         # Capture both the selected item nav AND the cursor nav (which may be a
         # section header when no item is selected) before sync, so focus_nav can
         # restore the cursor even when cursor is on a section node (self.selected
@@ -111,7 +163,7 @@ class CoopOSApp(ActionsMixin, App[None]):
             cursor_node = tree.cursor_node
             if cursor_node is not None:
                 cursor_nav = cursor_node.data
-        self._sync_state()
+        self._sync_state(initial_expansion)
         assert self.sm.state is not None
         if cursor_nav is not None:
             tree.focus_nav(cursor_nav)

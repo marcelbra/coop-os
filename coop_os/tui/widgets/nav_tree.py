@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import NamedTuple
 
 from rich.text import Text
 from textual.events import Click, Key, MouseDown
@@ -12,6 +13,12 @@ from textual.widgets._tree import TreeNode
 from coop_os.backend.models import ProjectState, Task
 from coop_os.tui.nav import Nav, choose_same_section_neighbor, is_content_nav, is_decorative_nav, truncate_label
 from coop_os.tui.widgets.config import DIR_ICON, FILE_ICON_DEFAULT, FILE_ICONS, SCANNED_ICONS, AppConfig, read_config
+
+
+class ExpansionState(NamedTuple):
+    sections: set[str]
+    tasks: set[str]
+    dirs: set[str]
 
 _TASK_DIR_PREFIX = re.compile(r"^task-\d+-")
 
@@ -223,24 +230,25 @@ class NavTree(Tree[Nav | None]):
 
     # ── Data methods ──────────────────────────────────────────────────────
 
-    def _expanded_state(self) -> tuple[set[str], set[str], set[str]]:
+    def expanded_state(self) -> ExpansionState:
         all_nodes = self.iter_all_nodes(self.root)
-        expanded = {
-            nav.section
-            for n in all_nodes
-            if (nav := n.data) is not None and nav.kind == "section" and n.is_expanded
-        }
-        expanded_tasks = {
-            nav.id
-            for n in all_nodes
-            if (nav := n.data) is not None and nav.kind == "task" and n.is_expanded
-        }
-        expanded_dirs = {
-            nav.id
-            for n in all_nodes
-            if (nav := n.data) is not None and nav.kind == "task_dir" and n.is_expanded
-        }
-        return expanded, expanded_tasks, expanded_dirs
+        return ExpansionState(
+            sections={
+                nav.section
+                for n in all_nodes
+                if (nav := n.data) is not None and nav.kind == "section" and n.is_expanded
+            },
+            tasks={
+                nav.id
+                for n in all_nodes
+                if (nav := n.data) is not None and nav.kind == "task" and n.is_expanded
+            },
+            dirs={
+                nav.id
+                for n in all_nodes
+                if (nav := n.data) is not None and nav.kind == "task_dir" and n.is_expanded
+            },
+        )
 
     @staticmethod
     def _section_label(arrow: str, name: str, filtered: bool) -> Text:
@@ -322,11 +330,16 @@ class NavTree(Tree[Nav | None]):
         task_dirs: dict[str, Path] | None = None,
         visible_role_ids: set[str] | None = None,
         visible_milestone_ids: set[str] | None = None,
+        initial_expansion: ExpansionState | None = None,
     ) -> None:
         """Rebuild tree from *state*, preserving section expansion.
 
         Pass pre-computed *visible_role_ids* and *visible_milestone_ids* from
         StateManager so filtering logic lives in one place.
+
+        On the first call (session restore), pass *initial_expansion* as
+        ``(sections, tasks, dirs)`` to seed the expansion state instead of
+        reading the (empty) tree.
         """
         role_filters = role_filters or set()
         milestone_filters = milestone_filters or set()
@@ -335,7 +348,7 @@ class NavTree(Tree[Nav | None]):
         visible_role_ids = visible_role_ids or set()
         visible_milestone_ids = visible_milestone_ids or set()
 
-        expanded, expanded_tasks, expanded_dirs = self._expanded_state()
+        expansion = initial_expansion if initial_expansion is not None else self.expanded_state()
         self._previous_visible_order = self._snapshot_visible_order()
         # Reset _cursor_node before clear() so Textual's _build() doesn't use the
         # stale old node to reposition the cursor (which would land it on whatever
@@ -355,7 +368,7 @@ class NavTree(Tree[Nav | None]):
         _header("Workspaces")
         _sep()
         self._build_workspaces(
-            state, expanded, expanded_tasks, expanded_dirs,
+            state, expansion.sections, expansion.tasks, expansion.dirs,
             cfg, role_filters, milestone_filters, task_filters, task_dirs,
             visible_role_ids, visible_milestone_ids,
         )
@@ -365,12 +378,12 @@ class NavTree(Tree[Nav | None]):
         _header("User")
         _sep()
         docs = self.root.add(
-            "○  Context", data=Nav("section", "", "contexts"), expand="contexts" in expanded
+            "○  Context", data=Nav("section", "", "contexts"), expand="contexts" in expansion.sections
         )
         for d in state.contexts:
             docs.add_leaf(truncate_label(f"• {d.title}"), data=Nav("context", d.id, "contexts"))
         notes = self.root.add(
-            "○  Notes", data=Nav("section", "", "notes"), expand="notes" in expanded
+            "○  Notes", data=Nav("section", "", "notes"), expand="notes" in expansion.sections
         )
         for n in state.notes:
             icon = SCANNED_ICONS["true"] if n.scanned else SCANNED_ICONS["false"]
@@ -386,7 +399,7 @@ class NavTree(Tree[Nav | None]):
             skills = self.root.add(
                 "◈  Skills",
                 data=Nav("section", "", "skills"),
-                expand="skills" in expanded,
+                expand="skills" in expansion.sections,
             )
             for s in state.skills:
                 skills.add_leaf(truncate_label(s.name), data=Nav("skill", s.id, "skills"))

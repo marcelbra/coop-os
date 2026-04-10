@@ -7,7 +7,7 @@ from coop_os.tui.widgets.content_panel import ContentPanel
 from coop_os.tui.widgets.date_field_input import DateFieldInput
 from coop_os.tui.widgets.field_input import FieldInput
 from coop_os.tui.widgets.header import FixedHeader
-from coop_os.tui.widgets.nav_tree import NavTree
+from coop_os.tui.widgets.nav_tree import ExpansionState, NavTree
 from coop_os.tui.widgets.select_input import SelectInput
 from coop_os.tui.widgets.split_footer import SplitFooter
 from coop_os.tui.widgets.structured_editor import StructuredEditor
@@ -22,6 +22,7 @@ __all__ = [
     "DetailTextArea",
     "FieldInput",
     "FixedHeader",
+    "ExpansionState",
     "NavTree",
     "SplitFooter",
     "SelectInput",
