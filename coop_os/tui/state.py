@@ -16,7 +16,7 @@ from coop_os.backend.models import (
     TaskStatus,
 )
 from coop_os.backend.store import ProjectStore
-from coop_os.tui.nav import Nav
+from coop_os.tui.nav import ContentNav, FileNav, Nav
 from coop_os.tui.widgets.config import AppConfig, read_config
 
 _KIND_TO_COLLECTION: dict[str, str] = {
@@ -106,7 +106,7 @@ class StateManager:
 
     def item(self, nav: Nav | None) -> Role | Milestone | Task | Note | Context | Skill | None:
         """Look up the item for *nav* in current state."""
-        if not nav or not self.state:
+        if not nav or not self.state or not isinstance(nav, ContentNav):
             return None
         attr = _KIND_TO_COLLECTION.get(nav.kind)
         if not attr:
@@ -121,8 +121,10 @@ class StateManager:
         """Resolve disk path for the item pointed to by *nav*."""
         if not nav:
             return None
-        if nav.kind == "agent":
-            return self.root / "coop_os" / "agent" / "AGENT.md"
-        if nav.kind == "task_file":
-            return Path(nav.id)
-        return self.store.find_item_path(nav.kind, nav.id)
+        if isinstance(nav, FileNav):
+            if nav.kind == "agent":
+                return self.root / "coop_os" / "agent" / "AGENT.md"
+            return nav.path  # task_file
+        if isinstance(nav, ContentNav):
+            return self.store.find_item_path(nav.kind, nav.id)
+        return None

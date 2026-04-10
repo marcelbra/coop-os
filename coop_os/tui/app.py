@@ -23,7 +23,7 @@ from coop_os.backend.models import (
 )
 from coop_os.backend.store import ProjectStore
 from coop_os.tui.actions import ActionsMixin
-from coop_os.tui.nav import NON_CONTENT_NAV_KINDS, Nav
+from coop_os.tui.nav import ContentNav, FileNav, Nav, StructuralNav, nav_from_parts, nav_to_parts
 from coop_os.tui.session import SessionState, load_session, save_session
 from coop_os.tui.state import StateManager
 from coop_os.tui.styles import CSS as APP_CSS
@@ -69,7 +69,7 @@ class CoopOSApp(ActionsMixin, App[None]):
         self.root = root
         store = ProjectStore(root)
         self.sm = StateManager(store, root)
-        self.selected: Nav | None = Nav("section", "", "roles")
+        self.selected: Nav | None = StructuralNav("section", "roles")
 
     # ── Layout ────────────────────────────────────────────────────────────────
 
@@ -86,7 +86,7 @@ class CoopOSApp(ActionsMixin, App[None]):
         self.sm.milestone_filters = session.milestone_filters
         self.sm.task_filters = session.task_filters
         if session.selected_kind:
-            self.selected = Nav(session.selected_kind, session.selected_id, session.selected_section)
+            self.selected = nav_from_parts(session.selected_kind, session.selected_id, session.selected_section)
         self._reload(initial_expansion=ExpansionState(
             session.expanded_sections, session.expanded_tasks, session.expanded_dirs
         ))
@@ -108,9 +108,10 @@ class CoopOSApp(ActionsMixin, App[None]):
                 cursor_node = tree.cursor_node
                 if cursor_node is not None:
                     cursor_nav = cursor_node.data
-            sel_kind = cursor_nav.kind if cursor_nav else "section"
-            sel_id = cursor_nav.id if cursor_nav else ""
-            sel_section = cursor_nav.section if cursor_nav else "roles"
+            if cursor_nav is not None:
+                sel_kind, sel_id, sel_section = nav_to_parts(cursor_nav)
+            else:
+                sel_kind, sel_id, sel_section = "section", "", "roles"
             save_session(self.root, SessionState(
                 role_filters=self.sm.role_filters,
                 milestone_filters=self.sm.milestone_filters,
@@ -193,16 +194,15 @@ class CoopOSApp(ActionsMixin, App[None]):
         pairs: list[tuple[str, str]] = []
         if not editing and nav is not None:
             new_kind: str | None = None
-            if nav.kind == "section" and nav.section in _SECTION_TO_KIND:
+            if isinstance(nav, StructuralNav) and nav.section in _SECTION_TO_KIND:
                 new_kind = _SECTION_TO_KIND[nav.section]
-            elif nav.kind in ("role", "milestone", "task", "note", "skill"):
+            elif isinstance(nav, ContentNav) and nav.kind != "context":
                 new_kind = nav.kind
             if new_kind:
                 pairs.append(("n", f"new {new_kind}"))
-            if nav.kind == "task":
+            if isinstance(nav, ContentNav) and nav.kind == "task":
                 pairs.append(("^n", "new subtask"))
-            deletable = {"role", "milestone", "task", "note", "context", "skill"}
-            if nav.kind in deletable:
+            if isinstance(nav, ContentNav):
                 pairs.append(("d", "delete"))
 
         self.query_one(SplitFooter).update_left(pairs)
@@ -231,7 +231,7 @@ class CoopOSApp(ActionsMixin, App[None]):
         content = self.query_one(ContentPanel)
         if content.is_editing:
             return
-        if nav is None or nav.kind in NON_CONTENT_NAV_KINDS:
+        if nav is None or isinstance(nav, StructuralNav):
             self.selected = None
             content.clear()
             return
@@ -243,7 +243,7 @@ class CoopOSApp(ActionsMixin, App[None]):
         nav = event.node.data
         self._update_footer_hints(nav)
         content = self.query_one(ContentPanel)
-        if nav is None or nav.kind in NON_CONTENT_NAV_KINDS:
+        if nav is None or isinstance(nav, StructuralNav):
             self.selected = None
             content.clear()
             return
@@ -293,7 +293,7 @@ class CoopOSApp(ActionsMixin, App[None]):
         content = self.query_one(ContentPanel)
         if content.is_editing:
             return
-        if self.selected.kind == "agent":
+        if isinstance(self.selected, FileNav) and self.selected.kind == "agent":
             path = self._item_path()
             if not path or not path.exists() or not self.sm.state:
                 return
@@ -301,7 +301,7 @@ class CoopOSApp(ActionsMixin, App[None]):
             agent_doc = SimpleNamespace(content=text)
             content.show_struct_view(agent_doc, "agent", self.sm.cfg(), self.sm.state)
             self.query_one(NavTree).focus()
-        elif self.selected.kind == "task_file":
+        elif isinstance(self.selected, FileNav) and self.selected.kind == "task_file":
             path = self._item_path()
             if not path or not path.exists() or not self.sm.state:
                 return
@@ -314,13 +314,14 @@ class CoopOSApp(ActionsMixin, App[None]):
             file_doc = SimpleNamespace(content=text, language=FILE_LANGUAGES.get(path.suffix.lower(), ""))
             content.show_struct_view(file_doc, "agent", self.sm.cfg(), self.sm.state)
             self.query_one(NavTree).focus()
-        elif self.selected.kind == "task_dir":
+        elif isinstance(self.selected, FileNav) and self.selected.kind == "task_dir":
             content.clear()
             self.query_one(NavTree).focus()
         else:
             item = self._item()
             if not item or not self.sm.state:
                 return
+            assert isinstance(self.selected, ContentNav)
             content.show_struct_view(item, self.selected.kind, self.sm.cfg(), self.sm.state)
             # Re-focus NavTree: show_struct_view applies -view-struct which makes
             # StructuredEditor visible; its focusable children can steal focus.
@@ -330,7 +331,7 @@ class CoopOSApp(ActionsMixin, App[None]):
         content = self.query_one(ContentPanel)
         if not self.selected:
             return
-        if self.selected.kind == "agent":
+        if isinstance(self.selected, FileNav) and self.selected.kind == "agent":
             path = self._item_path()
             if not path or not path.exists():
                 return
@@ -338,7 +339,7 @@ class CoopOSApp(ActionsMixin, App[None]):
             if not self.sm.state:
                 return
             content.enter_structured_edit(agent_doc, "agent", self.sm.cfg(), self.sm.state)
-        elif self.selected.kind == "task_file":
+        elif isinstance(self.selected, FileNav) and self.selected.kind == "task_file":
             path = self._item_path()
             if not path or not path.exists() or not self.sm.state:
                 return
@@ -352,6 +353,7 @@ class CoopOSApp(ActionsMixin, App[None]):
             item = self._item()
             if not item or not self.sm.state:
                 return
+            assert isinstance(self.selected, ContentNav)
             content.enter_structured_edit(item, self.selected.kind, self.sm.cfg(), self.sm.state, select_all=select_all)
 
     # ── Auto-save ─────────────────────────────────────────────────────────────

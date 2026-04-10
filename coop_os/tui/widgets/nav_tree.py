@@ -11,7 +11,16 @@ from textual.widgets import Tree
 from textual.widgets._tree import TreeNode
 
 from coop_os.backend.models import ProjectState, Task
-from coop_os.tui.nav import Nav, choose_same_section_neighbor, is_content_nav, is_decorative_nav, truncate_label
+from coop_os.tui.nav import (
+    ContentNav,
+    FileNav,
+    Nav,
+    StructuralNav,
+    choose_file_neighbor,
+    choose_same_section_neighbor,
+    is_decorative_nav,
+    truncate_label,
+)
 from coop_os.tui.widgets.config import DIR_ICON, FILE_ICON_DEFAULT, FILE_ICONS, SCANNED_ICONS, AppConfig, read_config
 
 
@@ -52,7 +61,7 @@ class NavTree(Tree[Nav | None]):
     ) -> None:
         super().__init__(
             label,
-            data=Nav("root", "", ""),
+            data=StructuralNav("root"),
             name=name,
             id=id,
             classes=classes,
@@ -107,13 +116,13 @@ class NavTree(Tree[Nav | None]):
     def on_tree_node_expanded(self, event: Tree.NodeExpanded[Nav | None]) -> None:
         node = event.node
         nav = self._require_nav(node)
-        if nav.kind == "section" and nav.section in self._WORKSPACE_SECTIONS:
+        if isinstance(nav, StructuralNav) and nav.section in self._WORKSPACE_SECTIONS:
             node.set_label(str(node.label).replace("▶", "▼", 1))
 
     def on_tree_node_collapsed(self, event: Tree.NodeCollapsed[Nav | None]) -> None:
         node = event.node
         nav = self._require_nav(node)
-        if nav.kind == "section" and nav.section in self._WORKSPACE_SECTIONS:
+        if isinstance(nav, StructuralNav) and nav.section in self._WORKSPACE_SECTIONS:
             node.set_label(str(node.label).replace("▼", "▶", 1))
 
     # ── Key handlers ──────────────────────────────────────────────────────
@@ -127,18 +136,7 @@ class NavTree(Tree[Nav | None]):
         if not node:
             return
         nav = self._require_nav(node)
-        _EDITABLE_KINDS = {"role", "milestone", "task", "note", "context", "skill", "agent", "task_file"}
-        if nav.kind != "section":
-            # Two-step: first → expands a collapsed branch (task with subtasks),
-            # moving cursor to first child. Second → opens the editor.
-            # Leaf nodes and already-expanded branches go straight to the editor.
-            if node.children and not node.is_expanded:
-                node.expand()
-                first = list(node.children)[0]
-                self.app.call_after_refresh(lambda n=first: self.move_cursor(n))
-            elif nav.kind in _EDITABLE_KINDS:
-                self.post_message(NavTree.EditRequested(nav))
-        else:
+        if isinstance(nav, StructuralNav) and nav.kind == "section":
             # Section node: expand and navigate to first child.
             # Do nothing if the section is empty — don't rotate the triangle.
             children = list(node.children)
@@ -149,6 +147,16 @@ class NavTree(Tree[Nav | None]):
                 node.expand()
             target = children[0]
             self.app.call_after_refresh(lambda n=target: self.move_cursor(n))
+        else:
+            # Two-step: first → expands a collapsed branch (task with subtasks),
+            # moving cursor to first child. Second → opens the editor.
+            # Leaf nodes and already-expanded branches go straight to the editor.
+            if node.children and not node.is_expanded:
+                node.expand()
+                first = list(node.children)[0]
+                self.app.call_after_refresh(lambda n=first: self.move_cursor(n))
+            elif isinstance(nav, (ContentNav, FileNav)) and nav.kind != "task_dir":
+                self.post_message(NavTree.EditRequested(nav))
         event.stop()
 
     def _handle_left(self, event: Key) -> None:
@@ -234,19 +242,19 @@ class NavTree(Tree[Nav | None]):
         all_nodes = self.iter_all_nodes(self.root)
         return ExpansionState(
             sections={
-                nav.section
+                n.data.section
                 for n in all_nodes
-                if (nav := n.data) is not None and nav.kind == "section" and n.is_expanded
+                if isinstance(n.data, StructuralNav) and n.data.kind == "section" and n.is_expanded
             },
             tasks={
-                nav.id
+                n.data.id
                 for n in all_nodes
-                if (nav := n.data) is not None and nav.kind == "task" and n.is_expanded
+                if isinstance(n.data, ContentNav) and n.data.kind == "task" and n.is_expanded
             },
             dirs={
-                nav.id
+                str(n.data.path)
                 for n in all_nodes
-                if (nav := n.data) is not None and nav.kind == "task_dir" and n.is_expanded
+                if isinstance(n.data, FileNav) and n.data.kind == "task_dir" and n.is_expanded
             },
         )
 
@@ -276,13 +284,13 @@ class NavTree(Tree[Nav | None]):
         roles_expand = "roles" in expanded and bool(visible_roles)
         roles_node = self.root.add(
             self._section_label("▼" if roles_expand else "▶", "Roles", bool(role_filters)),
-            data=Nav("section", "", "roles"),
+            data=StructuralNav("section", "roles"),
             expand=roles_expand,
         )
         for r in visible_roles:
             roles_node.add_leaf(
                 truncate_label(f"{cfg.role_statuses.get(r.status, '•')} {r.title}"),
-                data=Nav("role", r.id, "roles"),
+                data=ContentNav("role", r.id, "roles"),
             )
 
         ms_filter_active = bool(role_filters or milestone_filters)
@@ -293,13 +301,13 @@ class NavTree(Tree[Nav | None]):
         ms_expand = "milestones" in expanded and bool(visible_milestones)
         ms_node = self.root.add(
             self._section_label("▼" if ms_expand else "▶", "Milestones", bool(milestone_filters)),
-            data=Nav("section", "", "milestones"),
+            data=StructuralNav("section", "milestones"),
             expand=ms_expand,
         )
         for m in visible_milestones:
             ms_node.add_leaf(
                 truncate_label(f"{cfg.milestone_statuses.get(m.status, '•')} {m.title}"),
-                data=Nav("milestone", m.id, "milestones"),
+                data=ContentNav("milestone", m.id, "milestones"),
             )
 
         ms_ids_for_tasks = visible_milestone_ids if ms_filter_active else None
@@ -312,7 +320,7 @@ class NavTree(Tree[Nav | None]):
         tasks_expand = "tasks" in expanded and has_visible_tasks
         tasks_node = self.root.add(
             self._section_label("▼" if tasks_expand else "▶", "Tasks", bool(task_filters)),
-            data=Nav("section", "", "tasks"),
+            data=StructuralNav("section", "tasks"),
             expand=tasks_expand,
         )
         self._add_task_nodes(
@@ -359,10 +367,10 @@ class NavTree(Tree[Nav | None]):
         cfg = read_config(root)
 
         def _header(label: str) -> None:
-            self.root.add_leaf(Text(label, style="#7a9eb8"), data=Nav("header", label, ""))
+            self.root.add_leaf(Text(label, style="#7a9eb8"), data=StructuralNav("header"))
 
         def _sep() -> None:
-            self.root.add_leaf(Text("─" * 22, style="#30363d"), data=Nav("sep", "", ""))
+            self.root.add_leaf(Text("─" * 22, style="#30363d"), data=StructuralNav("sep"))
 
         # ── Workspaces group ──────────────────────────────────────
         _header("Workspaces")
@@ -378,31 +386,32 @@ class NavTree(Tree[Nav | None]):
         _header("User")
         _sep()
         docs = self.root.add(
-            "○  Context", data=Nav("section", "", "contexts"), expand="contexts" in expansion.sections
+            "○  Context", data=StructuralNav("section", "contexts"), expand="contexts" in expansion.sections
         )
         for d in state.contexts:
-            docs.add_leaf(truncate_label(f"• {d.title}"), data=Nav("context", d.id, "contexts"))
+            docs.add_leaf(truncate_label(f"• {d.title}"), data=ContentNav("context", d.id, "contexts"))
         notes = self.root.add(
-            "○  Notes", data=Nav("section", "", "notes"), expand="notes" in expansion.sections
+            "○  Notes", data=StructuralNav("section", "notes"), expand="notes" in expansion.sections
         )
         for n in state.notes:
             icon = SCANNED_ICONS["true"] if n.scanned else SCANNED_ICONS["false"]
-            notes.add_leaf(truncate_label(f"{icon} {n.title}"), data=Nav("note", n.id, "notes"))
+            notes.add_leaf(truncate_label(f"{icon} {n.title}"), data=ContentNav("note", n.id, "notes"))
         _sep()
 
         # ── Agent group ───────────────────────────────────────────
         _header("Agent")
         _sep()
-        if (root / "coop_os" / "agent" / "AGENT.md").exists():
-            self.root.add_leaf("◈  AGENT.md", data=Nav("agent", "agent", ""))
+        agent_path = root / "coop_os" / "agent" / "AGENT.md"
+        if agent_path.exists():
+            self.root.add_leaf("◈  AGENT.md", data=FileNav("agent", agent_path))
         if state.skills:
             skills = self.root.add(
                 "◈  Skills",
-                data=Nav("section", "", "skills"),
+                data=StructuralNav("section", "skills"),
                 expand="skills" in expansion.sections,
             )
             for s in state.skills:
-                skills.add_leaf(truncate_label(s.name), data=Nav("skill", s.id, "skills"))
+                skills.add_leaf(truncate_label(s.name), data=ContentNav("skill", s.id, "skills"))
         _sep()
 
     def _visible_nodes(self) -> list[TreeNode[Nav | None]]:
@@ -412,8 +421,10 @@ class NavTree(Tree[Nav | None]):
         order: dict[tuple[str, str], list[str]] = {}
         for node in self._visible_nodes():
             nav = node.data
-            if nav is not None and is_content_nav(nav):
+            if isinstance(nav, ContentNav):
                 order.setdefault((nav.kind, nav.section), []).append(nav.id)
+            elif isinstance(nav, FileNav) and nav.kind in ("task_file", "task_dir"):
+                order.setdefault(("task_extras", "tasks"), []).append(str(nav.path))
         return order
 
     def _first_navigable_node(self) -> TreeNode[Nav | None] | None:
@@ -423,23 +434,45 @@ class NavTree(Tree[Nav | None]):
                 return node
         return None
 
+    def _find_file_neighbor_node(self, nav: FileNav) -> TreeNode[Nav | None] | None:
+        """Return the nearest surviving task-extra node using the previous mixed order."""
+        previous_paths = self._previous_visible_order.get(("task_extras", "tasks"), [])
+        surviving: list[tuple[TreeNode[Nav | None], FileNav]] = [
+            (node, node.data)
+            for node in self._visible_nodes()
+            if isinstance(node.data, FileNav) and node.data.kind in ("task_file", "task_dir")
+        ]
+        surviving_paths = [str(fn.path) for _, fn in surviving]
+        fallback_path = choose_file_neighbor(str(nav.path), previous_paths, surviving_paths)
+        if fallback_path is not None:
+            return next((n for n, fn in surviving if str(fn.path) == fallback_path), None)
+        return None
+
     def focus_nav(self, nav: Nav) -> None:
         """Move the tree cursor to *nav*, keeping same-section fallback semantics."""
-        target = self._find_node(nav) if nav.kind != "section" else self._find_section_node(nav.section)
-
-        if target is None and nav.kind != "section":
-            current_section_navs = [
-                node.data
-                for node in self._visible_nodes()
-                if node.data is not None and is_content_nav(node.data) and node.data.section == nav.section
-            ]
-            previous_ids = self._previous_visible_order.get((nav.kind, nav.section), [])
-            fallback_nav = choose_same_section_neighbor(nav, previous_ids, current_section_navs)
-            if fallback_nav is not None:
-                target = self._find_node(fallback_nav)
-
-        if target is None and nav.section:
+        if isinstance(nav, StructuralNav) and nav.kind == "section":
             target = self._find_section_node(nav.section)
+        else:
+            target = self._find_node(nav)
+            if target is None and isinstance(nav, ContentNav):
+                current_section_navs: list[ContentNav] = [
+                    node.data
+                    for node in self._visible_nodes()
+                    if isinstance(node.data, ContentNav) and node.data.section == nav.section
+                ]
+                previous_ids = self._previous_visible_order.get((nav.kind, nav.section), [])
+                fallback_nav = choose_same_section_neighbor(nav, previous_ids, current_section_navs)
+                if fallback_nav is not None:
+                    target = self._find_node(fallback_nav)
+
+        if target is None and isinstance(nav, FileNav) and nav.kind in ("task_file", "task_dir"):
+            target = self._find_file_neighbor_node(nav)
+
+        if target is None:
+            if isinstance(nav, ContentNav) and nav.section:
+                target = self._find_section_node(nav.section)
+            elif isinstance(nav, FileNav) and nav.kind in ("task_file", "task_dir"):
+                target = self._find_section_node("tasks")
 
         if target is None:
             target = self._first_navigable_node()
@@ -454,7 +487,7 @@ class NavTree(Tree[Nav | None]):
             (
                 node
                 for node in self.root.children
-                if node.data is not None and node.data.kind == "section" and node.data.section == section
+                if node.data == StructuralNav("section", section)
             ),
             None,
         )
@@ -464,7 +497,7 @@ class NavTree(Tree[Nav | None]):
             (
                 node
                 for node in self.iter_all_nodes(self.root)
-                if node.data is not None and node.data.id == nav.id and node.data.kind == nav.kind
+                if node.data == nav
             ),
             None,
         )
@@ -491,13 +524,13 @@ class NavTree(Tree[Nav | None]):
             children = sorted(path.iterdir())
             if children:
                 expanded = str(path) in expanded_dirs
-                node = parent_node.add(label, data=Nav("task_dir", str(path), "tasks"), expand=expanded)
+                node = parent_node.add(label, data=FileNav("task_dir", path), expand=expanded)
                 for child in children:
                     self._add_path_node(node, child, expanded_dirs)
             else:
-                parent_node.add_leaf(label, data=Nav("task_dir", str(path), "tasks"))
+                parent_node.add_leaf(label, data=FileNav("task_dir", path))
         else:
-            parent_node.add_leaf(label, data=Nav("task_file", str(path), "tasks"))
+            parent_node.add_leaf(label, data=FileNav("task_file", path))
 
     def _add_task_nodes(
         self,
@@ -526,7 +559,7 @@ class NavTree(Tree[Nav | None]):
             has_subtasks = any(c.parent == t.id for c in all_tasks)
             task_dir = task_dirs.get(t.id)
             extra = _list_task_extras(task_dir) if task_dir else []
-            nav = Nav("task", t.id, "tasks")
+            nav = ContentNav("task", t.id, "tasks")
             if has_subtasks or extra:
                 branch = parent_node.add(label, data=nav, expand=t.id in expanded_tasks)
                 self._add_task_nodes(
