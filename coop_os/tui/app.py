@@ -152,6 +152,14 @@ class CoopOSApp(ActionsMixin, App[None]):
         )
 
     def _reload(self, initial_expansion: ExpansionState | None = None) -> None:
+        """Reload state from disk while preserving the cursor position.
+
+        Cursor-preservation contract: captures `selected` and `cursor_nav` before
+        sync (section headers set selected=None, so the old guard missed cursor
+        restoration on header nodes). After _sync_state completes, restores cursor
+        via focus_nav. Also triggers _show_view only when an item is selected, and
+        emits a parse-error notification if errors are present.
+        """
         # Capture both the selected item nav AND the cursor nav (which may be a
         # section header when no item is selected) before sync, so focus_nav can
         # restore the cursor even when cursor is on a section node (self.selected
@@ -288,6 +296,14 @@ class CoopOSApp(ActionsMixin, App[None]):
 
     @work(exclusive=True)
     async def _show_view(self) -> None:
+        """Dispatch to the correct content view based on the selected nav item.
+
+        Four dispatch paths:
+        1. FileNav("agent") — reads AGENT.md and shows the structured view
+        2. FileNav("task_file") — reads the file and shows the structured view with the file's language
+        3. FileNav("task_dir") — clears the content panel (no file to show)
+        4. ContentNav — looks up the item in state and shows the structured view
+        """
         if not self.selected:
             return
         content = self.query_one(ContentPanel)
