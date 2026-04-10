@@ -41,7 +41,7 @@ class FilterScreen(ModalScreen[set[str] | None]):
                     mark = "◉" if value in self._selected else "○"
                     cls = "fs-option -cursor" if i == self._cursor else "fs-option"
                     yield Static(f" {mark}  {label}", id=f"fs-opt-{i}", classes=cls)
-            yield Static("space toggle · g toggle group · enter confirm · esc cancel", id="fs-hint")
+            yield Static("space toggle · g toggle group · d clear all · enter confirm · esc cancel", id="fs-hint")
 
     def on_mount(self) -> None:
         self.styles.background = Color(0, 0, 0, a=0.6)
@@ -124,3 +124,7 @@ class FilterScreen(ModalScreen[set[str] | None]):
         elif key == "g":
             event.stop()
             self._toggle_group()
+        elif key == "d":
+            event.stop()
+            self._selected.clear()
+            self._refresh_options()
