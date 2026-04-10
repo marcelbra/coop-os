@@ -62,7 +62,7 @@ When `develop` is stable and ready to ship:
 **Always wait for CI before merging.** After creating a PR, run `gh pr checks <n> --repo marcelbra/coop-os --watch` and wait for all checks to pass. Only then merge with `--admin`. Never merge while checks are failing or pending.
 
 **Always ask the user to review and test before committing.** After implementing:
-1. Show what changed
+1. Explain what changed, , concisely
 2. Run `make check` — if it passes, prompt the user to test
 3. Give them the exact commands to run in a new terminal window, as two lines:
    ```
