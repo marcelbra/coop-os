@@ -9,6 +9,7 @@ from typing import Any, Protocol
 import frontmatter
 
 from coop_os.backend.models import (
+    Attachment,
     Context,
     Milestone,
     Note,
@@ -264,6 +265,11 @@ class TaskStore:
                     milestone=str(meta["milestone"]) if meta.get("milestone") else None,
                     parent=parent_id,
                     description=content,
+                    attachments=[
+                        Attachment(**attachment)
+                        for attachment in meta.get("attachments", [])
+                        if (task_dir / attachment["filename"]).exists()
+                    ],
                 ))
                 self._load_from_dir(task_dir, str(meta["id"]), tasks, errors)
             except Exception as e:
@@ -302,6 +308,8 @@ class TaskStore:
             meta["milestone"] = task.milestone
         if task.parent:
             meta["parent"] = task.parent
+        if task.attachments:
+            meta["attachments"] = [attachment.model_dump() for attachment in task.attachments]
         _write_fm(task_dir / "description.md", meta, task.description)
 
     def delete(self, task_id: str) -> bool:

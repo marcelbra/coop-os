@@ -34,6 +34,7 @@ class StructuredEditor(Widget):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._kind: str = ""
+        self._extra_meta: dict[str, Any] = {}
 
     def compose(self):
         for attr_key, label, _kinds, readonly in FIELD_DEFS:
@@ -86,6 +87,33 @@ class StructuredEditor(Widget):
             ta.language = language or None
         ta.load_text(body)
         ta.move_cursor((0, 0))
+        self._capture_extra_meta(item, kind)
+
+    def _capture_extra_meta(self, item: Any, kind: str) -> None:
+        """Capture Pydantic model fields not rendered by FIELD_DEFS into _extra_meta.
+
+        Preserves fields like 'attachments' that the structured editor doesn't know
+        about, so editor_text can round-trip them without data loss. SimpleNamespace
+        objects (agent/task_file items) are skipped — they have no model_fields.
+        """
+        if not hasattr(type(item), "model_fields"):
+            self._extra_meta = {}
+            return
+        schema_keys = {attr_key for attr_key, _, kinds, _ in FIELD_DEFS if kind in kinds}
+        body_key = BODY_ATTR.get(kind, "content")
+        self._extra_meta = {}
+        for field_name in type(item).model_fields:
+            if field_name in schema_keys or field_name == body_key:
+                continue
+            val = getattr(item, field_name, None)
+            if val is None or val == [] or val == "":
+                continue
+            if isinstance(val, list) and val and hasattr(val[0], "model_dump"):
+                self._extra_meta[field_name] = [cast(Any, v).model_dump() for v in val]
+            elif hasattr(val, "model_dump"):
+                self._extra_meta[field_name] = cast(Any, val).model_dump()
+            else:
+                self._extra_meta[field_name] = val
 
     def _raw_attr_to_str(self, raw: Any) -> str:
         """Convert a raw attribute value to a string for display in a field."""
@@ -239,7 +267,7 @@ class StructuredEditor(Widget):
             return ""
         if self._kind == "agent":
             return self.query_one("#se-body", BodyTextArea).text
-        meta: dict[str, Any] = {}
+        meta: dict[str, Any] = dict(self._extra_meta)
         for attr_key, _label, kinds, _readonly in FIELD_DEFS:
             if self._kind not in kinds:
                 continue

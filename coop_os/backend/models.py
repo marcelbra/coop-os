@@ -44,6 +44,11 @@ class Milestone(BaseModel):
     description: str = ""
 
 
+class Attachment(BaseModel):
+    filename: str  # as stored on disk (may differ from original if renamed)
+    added_at: str  # ISO-8601 datetime, e.g. "2026-04-10T14:30:00"
+
+
 class Task(BaseModel):
     id: str
     title: str
@@ -53,6 +58,7 @@ class Task(BaseModel):
     milestone: str | None = None
     parent: str | None = None
     description: str = ""
+    attachments: list[Attachment] = []
 
 
 class Note(BaseModel):

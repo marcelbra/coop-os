@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import os
+import re
+import shutil
 import signal
 import types
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,9 +14,11 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.css.query import NoMatches
+from textual.events import Paste
 from textual.widgets import Tree
 
 from coop_os.backend.models import (
+    Attachment,
     Context,
     Milestone,
     Note,
@@ -210,6 +215,7 @@ class CoopOSApp(ActionsMixin, App[None]):
                 pairs.append(("n", f"new {new_kind}"))
             if isinstance(nav, ContentNav) and nav.kind == "task":
                 pairs.append(("^n", "new subtask"))
+                pairs.append(("drop", "attach file"))
             if isinstance(nav, ContentNav):
                 pairs.append(("d", "delete"))
 
@@ -386,6 +392,105 @@ class CoopOSApp(ActionsMixin, App[None]):
             self._sync_state()
         except Exception as e:
             self.notify(str(e), severity="error", timeout=4)
+
+    # ── Drag-and-drop file attachment ─────────────────────────────────────────
+
+    def on_paste(self, event: Paste) -> None:
+        """Handle file drops via terminal paste events.
+
+        Terminal emulators inject dragged file paths as paste events. We intercept
+        these only when the editor is not open and the cursor is on a task or on a
+        file/dir that lives inside a task directory, then copy the files into the
+        task directory and persist attachment metadata.
+        """
+        content = self.query_one(ContentPanel)
+        if content.is_editing:
+            return
+        task_dirs = self.sm.task_dirs()
+        task_id = self._resolve_target_task_id(self.selected, task_dirs)
+        if task_id is None:
+            return
+        paths = self._parse_file_paths(event.text)
+        if not paths:
+            return
+        event.stop()
+        task_dir = task_dirs.get(task_id)
+        if not task_dir:
+            return
+        task = self.sm.item(ContentNav("task", task_id, "tasks"))
+        if not isinstance(task, Task):
+            return
+        new_attachments = list(task.attachments)
+        added_names: list[str] = []
+        for source in paths:
+            dest_name = self._resolve_attachment_name(task_dir, source.name)
+            shutil.copy2(source, task_dir / dest_name)
+            new_attachments.append(Attachment(
+                filename=dest_name,
+                added_at=datetime.now().isoformat(timespec="seconds"),
+            ))
+            added_names.append(dest_name)
+        self.sm.store.tasks.save(task.model_copy(update={"attachments": new_attachments}))
+        self._reload()
+        self.notify(f"Attached: {', '.join(added_names)}", severity="information", timeout=3)
+
+    @staticmethod
+    def _resolve_target_task_id(nav: Nav | None, task_dirs: dict[str, Path]) -> str | None:
+        """Return the task ID that should receive a file drop for the given nav.
+
+        Handles two cases:
+        - Cursor is on a task node directly → use that task.
+        - Cursor is on a file or dir that lives inside a task directory → find
+          the deepest owning task (deepest = most specific, handles subtask nesting).
+        """
+        if isinstance(nav, ContentNav) and nav.kind == "task":
+            return nav.id
+        if isinstance(nav, FileNav) and nav.kind in ("task_file", "task_dir"):
+            matching = {
+                task_id: task_dir
+                for task_id, task_dir in task_dirs.items()
+                if nav.path.is_relative_to(task_dir)
+            }
+            if matching:
+                return max(matching, key=lambda tid: len(matching[tid].parts))
+        return None
+
+    @staticmethod
+    def _parse_file_paths(text: str) -> list[Path]:
+        """Parse pasted text into a list of existing file paths.
+
+        Handles quoted paths, shell-escaped spaces, and multi-line paste (one path
+        per line). Returns only paths that exist and are regular files.
+        """
+        paths: list[Path] = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            for quote in ("'", '"'):
+                if line.startswith(quote) and line.endswith(quote):
+                    line = line[1:-1]
+            line = re.sub(r"\\(.)", r"\1", line)
+            candidate = Path(line)
+            if candidate.exists() and candidate.is_file():
+                paths.append(candidate)
+        return paths
+
+    @staticmethod
+    def _resolve_attachment_name(task_dir: Path, filename: str) -> str:
+        """Return a non-conflicting filename within task_dir.
+
+        If *filename* already exists, appends '-2', '-3', etc. until a free name
+        is found.
+        """
+        if not (task_dir / filename).exists():
+            return filename
+        stem = Path(filename).stem
+        suffix = Path(filename).suffix
+        counter = 2
+        while (task_dir / f"{stem}-{counter}{suffix}").exists():
+            counter += 1
+        return f"{stem}-{counter}{suffix}"
 
     # ── Misc ──────────────────────────────────────────────────────────────────
 

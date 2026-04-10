@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 from datetime import date
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from textual import work
@@ -70,6 +71,27 @@ class _CoopOSHost(_HostBase):
         name_options: list[tuple[str, str]] | None = None,
         dismiss_key: str | None = None,
     ) -> None: ...
+
+
+def _prune_task_attachment(sm: StateManager, deleted_path: Path) -> None:
+    """Remove deleted_path from its parent task's attachment list, if present.
+
+    Called after a task_file is deleted from disk so the task's frontmatter
+    stays consistent with the actual files on disk.
+    """
+    task_id = next(
+        (tid for tid, task_dir in sm.task_dirs().items() if deleted_path.parent == task_dir),
+        None,
+    )
+    if task_id is None:
+        return
+    task = sm.item(ContentNav("task", task_id, "tasks"))
+    if not isinstance(task, Task) or not task.attachments:
+        return
+    updated_attachments = [attachment for attachment in task.attachments if attachment.filename != deleted_path.name]
+    if len(updated_attachments) != len(task.attachments):
+        sm.store.tasks.save(task.model_copy(update={"attachments": updated_attachments}))
+
 
 class ActionsMixin(_CoopOSHost):
     """CRUD and filter actions for CoopOSApp.
@@ -278,6 +300,8 @@ class ActionsMixin(_CoopOSHost):
             p = nav.path
             if p.is_file():
                 p.unlink()
+                if nav.kind == "task_file":
+                    _prune_task_attachment(self.sm, p)
                 deleted = True
             elif p.is_dir():
                 shutil.rmtree(p)
