@@ -31,7 +31,7 @@ Two long-lived branches:
    ```
 6. Group changes by concern — one logical unit per PR
 
-Use squash merge: `gh pr merge <n> --repo marcelbra/coop-os --squash --delete-branch`
+Use squash merge: `gh pr merge <n> --repo marcelbra/coop-os --squash --delete-branch --auto`
 
 After merging, switch to develop and pull: `git checkout develop && git pull origin develop`
 
@@ -49,7 +49,7 @@ When `develop` is stable and ready to ship:
    ```
 3. Merge with a merge commit (not squash — preserves develop history):
    ```
-   gh pr merge <n> --repo marcelbra/coop-os --merge
+   gh pr merge <n> --repo marcelbra/coop-os --merge --auto
    ```
 4. The release workflow auto-tags `vX.Y.Z` and publishes to PyPI.
 5. Pull main locally: `git checkout main && git pull origin main`
@@ -58,7 +58,7 @@ When `develop` is stable and ready to ship:
 
 ### Merging rules
 
-**Always wait 5 seconds after creating a PR before merging** — GitHub needs a moment to register the PR or pushes may fail. Use `sleep 5` between the `gh pr create` and `gh pr merge` calls.
+**Always use `--auto` when merging** — never `--admin`. `--auto` waits for all required CI checks to pass before merging; `--admin` bypasses them entirely. Always let CI run.
 
 **Always ask the user to test the changes before creating a PR.** After implementing, prompt the user to verify it works, then wait for confirmation before proceeding to create and merge the PR.
 
@@ -83,6 +83,35 @@ Use the Makefile for common tasks:
 | `make install` | Install dependencies |
 
 Always run `make check` after making changes — it runs ruff, basedpyright, and pytest. Use `make fix` to auto-resolve import ordering and other fixable issues.
+
+## Code Standards
+
+### Naming
+Always use explicit, descriptive names. No single-letter variables, no abbreviations — even when context makes the meaning obvious. Prefer clarity over brevity at every scope level.
+
+```python
+# bad
+for i in ids: ...
+m = re.search(...)
+d = _find_task_dir(...)
+
+# good
+for id_str in ids: ...
+match = re.search(...)
+task_dir = _find_task_dir(...)
+```
+
+### Docstrings
+Add docstrings to any function whose behavior or intent is not immediately obvious from its signature. Document:
+- What it does and why (not just how)
+- Non-obvious contracts, invariants, or edge cases
+- Filtering logic, cascade rules, preservation guarantees
+
+### Type safety
+Every function must be fully typed — parameters, return values, and local variables where the type is not inferred. No `Any` unless genuinely unavoidable. Run `make lint` (basedpyright) to verify.
+
+### Tests
+Write tests for any non-trivial behavior. Before writing tests for a new feature or edge case, confirm the intended behavior with the user first. Tests must cover the real contract, not just the happy path.
 
 ## Development Mode
 
