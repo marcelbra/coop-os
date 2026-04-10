@@ -19,7 +19,7 @@ from coop_os.backend.models import (
 )
 from coop_os.backend.store import ProjectStore
 from coop_os.tui.actions import ActionsMixin
-from coop_os.tui.nav import Nav
+from coop_os.tui.nav import NON_CONTENT_NAV_KINDS, Nav
 from coop_os.tui.state import StateManager
 from coop_os.tui.styles import CSS as APP_CSS
 from coop_os.tui.widgets import (
@@ -99,11 +99,23 @@ class CoopOSApp(ActionsMixin, App[None]):
         )
 
     def _reload(self) -> None:
+        # Capture both the selected item nav AND the cursor nav (which may be a
+        # section header when no item is selected) before sync, so focus_nav can
+        # restore the cursor even when cursor is on a section node (self.selected
+        # is None for sections, so the old `if selected:` guard skipped focus_nav,
+        # leaving cursor_line stale after rebuild — pointing to a divider).
+        selected = self.selected
+        tree = self.query_one(NavTree)
+        cursor_nav: Nav | None = selected
+        if cursor_nav is None:
+            cursor_node = tree.cursor_node
+            if cursor_node is not None:
+                cursor_nav = cursor_node.data
         self._sync_state()
         assert self.sm.state is not None
-        tree = self.query_one(NavTree)
-        if self.selected:
-            tree.focus_nav(self.selected)
+        if cursor_nav is not None:
+            tree.focus_nav(cursor_nav)
+        if selected is not None:
             self._show_view()
         if self.sm.state.errors:
             self.notify(
@@ -111,6 +123,10 @@ class CoopOSApp(ActionsMixin, App[None]):
                 severity="warning",
                 timeout=4,
             )
+
+    def reload_state(self) -> None:
+        """Public reload entry point that preserves cursor and selection."""
+        self._reload()
 
     def _item(self) -> Role | Milestone | Task | Note | Context | Skill | None:
         return self.sm.item(self.selected)
@@ -163,7 +179,7 @@ class CoopOSApp(ActionsMixin, App[None]):
         content = self.query_one(ContentPanel)
         if content.is_editing:
             return
-        if not nav or nav.kind == "section":
+        if nav is None or nav.kind in NON_CONTENT_NAV_KINDS:
             self.selected = None
             content.clear()
             return
@@ -175,7 +191,7 @@ class CoopOSApp(ActionsMixin, App[None]):
         nav = event.node.data
         self._update_footer_hints(nav)
         content = self.query_one(ContentPanel)
-        if not nav or nav.kind == "section":
+        if nav is None or nav.kind in NON_CONTENT_NAV_KINDS:
             self.selected = None
             content.clear()
             return

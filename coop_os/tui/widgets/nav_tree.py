@@ -10,7 +10,7 @@ from textual.widgets import Tree
 from textual.widgets._tree import TreeNode
 
 from coop_os.backend.models import ProjectState, Task
-from coop_os.tui.nav import Nav, truncate_label
+from coop_os.tui.nav import Nav, choose_same_section_neighbor, is_content_nav, is_decorative_nav, truncate_label
 from coop_os.tui.widgets.config import DIR_ICON, FILE_ICON_DEFAULT, FILE_ICONS, SCANNED_ICONS, AppConfig, read_config
 
 _TASK_DIR_PREFIX = re.compile(r"^task-\d+-")
@@ -33,6 +33,25 @@ class NavTree(Tree[Nav | None]):
 
     ICON_NODE = ""
     ICON_NODE_EXPANDED = ""
+
+    def __init__(
+        self,
+        label: str,
+        *,
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
+    ) -> None:
+        super().__init__(
+            label,
+            data=Nav("root", "", ""),
+            name=name,
+            id=id,
+            classes=classes,
+            disabled=disabled,
+        )
+        self._previous_visible_order: dict[tuple[str, str], list[str]] = {}
 
     class EditRequested(Message):
         """User pressed → on a node and wants to enter edit mode."""
@@ -72,31 +91,35 @@ class NavTree(Tree[Nav | None]):
 
     _WORKSPACE_SECTIONS = ("roles", "milestones", "tasks")
 
+    @staticmethod
+    def _require_nav(node: TreeNode[Nav | None]) -> Nav:
+        nav = node.data
+        assert nav is not None
+        return nav
+
     def on_tree_node_expanded(self, event: Tree.NodeExpanded[Nav | None]) -> None:
         node = event.node
-        nav = node.data
-        if isinstance(nav, Nav) and nav.kind == "section" and nav.section in self._WORKSPACE_SECTIONS:
+        nav = self._require_nav(node)
+        if nav.kind == "section" and nav.section in self._WORKSPACE_SECTIONS:
             node.set_label(str(node.label).replace("▶", "▼", 1))
 
     def on_tree_node_collapsed(self, event: Tree.NodeCollapsed[Nav | None]) -> None:
         node = event.node
-        nav = node.data
-        if isinstance(nav, Nav) and nav.kind == "section" and nav.section in self._WORKSPACE_SECTIONS:
+        nav = self._require_nav(node)
+        if nav.kind == "section" and nav.section in self._WORKSPACE_SECTIONS:
             node.set_label(str(node.label).replace("▼", "▶", 1))
 
     # ── Key handlers ──────────────────────────────────────────────────────
 
     def _is_interactive(self, node: TreeNode[Nav | None]) -> bool:
-        return isinstance(node.data, Nav)
+        data = node.data
+        return data is not None and not is_decorative_nav(data)
 
     def _handle_right(self, event: Key) -> None:
         node = self.cursor_node
         if not node:
             return
-        nav = node.data
-        if not isinstance(nav, Nav):
-            event.stop()
-            return
+        nav = self._require_nav(node)
         _EDITABLE_KINDS = {"role", "milestone", "task", "note", "context", "skill", "agent", "task_file"}
         if nav.kind != "section":
             # Two-step: first → expands a collapsed branch (task with subtasks),
@@ -189,10 +212,6 @@ class NavTree(Tree[Nav | None]):
         node = self.cursor_node
         if not node:
             return
-        nav = node.data
-        if not isinstance(nav, Nav):
-            event.stop()
-            return
         if node.children:
             if node.is_expanded:
                 node.collapse()
@@ -207,19 +226,19 @@ class NavTree(Tree[Nav | None]):
     def _expanded_state(self) -> tuple[set[str], set[str], set[str]]:
         all_nodes = self.iter_all_nodes(self.root)
         expanded = {
-            n.data.section
+            nav.section
             for n in all_nodes
-            if isinstance(n.data, Nav) and n.data.kind == "section" and n.is_expanded
+            if (nav := n.data) is not None and nav.kind == "section" and n.is_expanded
         }
         expanded_tasks = {
-            n.data.id
+            nav.id
             for n in all_nodes
-            if isinstance(n.data, Nav) and n.data.kind == "task" and n.is_expanded
+            if (nav := n.data) is not None and nav.kind == "task" and n.is_expanded
         }
         expanded_dirs = {
-            n.data.id
+            nav.id
             for n in all_nodes
-            if isinstance(n.data, Nav) and n.data.kind == "task_dir" and n.is_expanded
+            if (nav := n.data) is not None and nav.kind == "task_dir" and n.is_expanded
         }
         return expanded, expanded_tasks, expanded_dirs
 
@@ -317,15 +336,20 @@ class NavTree(Tree[Nav | None]):
         visible_milestone_ids = visible_milestone_ids or set()
 
         expanded, expanded_tasks, expanded_dirs = self._expanded_state()
+        self._previous_visible_order = self._snapshot_visible_order()
+        # Reset _cursor_node before clear() so Textual's _build() doesn't use the
+        # stale old node to reposition the cursor (which would land it on whatever
+        # node happens to be at the old line number in the rebuilt tree).
+        self._cursor_node = None
         self.clear()
 
         cfg = read_config(root)
 
         def _header(label: str) -> None:
-            self.root.add_leaf(Text(label, style="#7a9eb8"), data=None)
+            self.root.add_leaf(Text(label, style="#7a9eb8"), data=Nav("header", label, ""))
 
         def _sep() -> None:
-            self.root.add_leaf(Text("─" * 22, style="#30363d"), data=None)
+            self.root.add_leaf(Text("─" * 22, style="#30363d"), data=Nav("sep", "", ""))
 
         # ── Workspaces group ──────────────────────────────────────
         _header("Workspaces")
@@ -368,27 +392,75 @@ class NavTree(Tree[Nav | None]):
                 skills.add_leaf(truncate_label(s.name), data=Nav("skill", s.id, "skills"))
         _sep()
 
+    def _visible_nodes(self) -> list[TreeNode[Nav | None]]:
+        return [line.node for line in self._tree_lines]
+
+    def _snapshot_visible_order(self) -> dict[tuple[str, str], list[str]]:
+        order: dict[tuple[str, str], list[str]] = {}
+        for node in self._visible_nodes():
+            nav = node.data
+            if nav is not None and is_content_nav(nav):
+                order.setdefault((nav.kind, nav.section), []).append(nav.id)
+        return order
+
+    def _first_navigable_node(self) -> TreeNode[Nav | None] | None:
+        """Return the first interactive visible node, or None if the tree is empty."""
+        for node in self._visible_nodes():
+            if self._is_interactive(node):
+                return node
+        return None
+
     def focus_nav(self, nav: Nav) -> None:
-        """Move the tree cursor to *nav*, expanding its section if needed."""
-        if nav.kind == "section":
-            for section in self.root.children:
-                if isinstance(section.data, Nav) and section.data.section == nav.section:
-                    self.app.call_after_refresh(lambda n=section: self.move_cursor(n))
-                    return
-            return
-        for node in self.iter_all_nodes(self.root):
-            if (
-                isinstance(node.data, Nav)
-                and node.data.id == nav.id
-                and node.data.kind == nav.kind
-            ):
-                # Expand all ancestors up to root
-                ancestor = node.parent
-                while ancestor and ancestor is not self.root:
-                    ancestor.expand()
-                    ancestor = ancestor.parent
-                self.app.call_after_refresh(lambda n=node: self.move_cursor(n))
-                return
+        """Move the tree cursor to *nav*, keeping same-section fallback semantics."""
+        target = self._find_node(nav) if nav.kind != "section" else self._find_section_node(nav.section)
+
+        if target is None and nav.kind != "section":
+            current_section_navs = [
+                node.data
+                for node in self._visible_nodes()
+                if node.data is not None and is_content_nav(node.data) and node.data.section == nav.section
+            ]
+            previous_ids = self._previous_visible_order.get((nav.kind, nav.section), [])
+            fallback_nav = choose_same_section_neighbor(nav, previous_ids, current_section_navs)
+            if fallback_nav is not None:
+                target = self._find_node(fallback_nav)
+
+        if target is None and nav.section:
+            target = self._find_section_node(nav.section)
+
+        if target is None:
+            target = self._first_navigable_node()
+
+        if target is not None:
+            self._expand_to(target)
+            _ = self._tree_lines  # noqa: F841
+            self.move_cursor(target)
+
+    def _find_section_node(self, section: str) -> TreeNode[Nav | None] | None:
+        return next(
+            (
+                node
+                for node in self.root.children
+                if node.data is not None and node.data.kind == "section" and node.data.section == section
+            ),
+            None,
+        )
+
+    def _find_node(self, nav: Nav) -> TreeNode[Nav | None] | None:
+        return next(
+            (
+                node
+                for node in self.iter_all_nodes(self.root)
+                if node.data is not None and node.data.id == nav.id and node.data.kind == nav.kind
+            ),
+            None,
+        )
+
+    def _expand_to(self, node: TreeNode[Nav | None]) -> None:
+        ancestor = node.parent
+        while ancestor and ancestor is not self.root:
+            ancestor.expand()
+            ancestor = ancestor.parent
 
     def iter_all_nodes(self, node: TreeNode[Nav | None]) -> list[TreeNode[Nav | None]]:
         """Recursively collect all descendant nodes."""
