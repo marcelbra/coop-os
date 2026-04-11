@@ -179,6 +179,9 @@ class StructuredEditor(Widget):
                 widget.add_class("se-view-disabled")
         ta = self.query_one("#se-body", BodyTextArea)
         ta.read_only = not editable
+        # Disable focus in view mode so clicking the body area doesn't steal
+        # focus from the NavTree (read_only prevents editing but not focusing).
+        ta.can_focus = editable
 
     def focus_first(self, select_all: bool = False) -> None:
         """Focus the first editable field (new items only) or the body (existing items)."""

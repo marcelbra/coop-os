@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from textual.containers import ScrollableContainer
+from textual.events import MouseDown
 from textual.widget import Widget
 from textual.widgets import Markdown
 
@@ -31,6 +32,30 @@ class ContentPanel(Widget):
             "", language="markdown", theme="vscode_dark", classes="cp-raw-editor"
         )
         yield StructuredEditor()
+
+    def on_mount(self) -> None:
+        # The viewer is a scroll container shown in non-editing modes. It never
+        # needs keyboard focus — mouse-wheel scrolling works without it — so
+        # we disable focusability here to prevent it from stealing focus from
+        # the NavTree when the user clicks the content panel in view mode.
+        self.query_one(".cp-viewer").can_focus = False
+
+    def on_mouse_down(self, event: MouseDown) -> None:
+        """Prevent content-panel children from stealing focus in non-editing modes.
+
+        Two mechanisms work together here:
+        - on_mount sets can_focus=False on .cp-viewer, which is the primary fix:
+          Markdown widgets are not focusable by default, so the ScrollableContainer
+          was the only child that could steal focus in view mode.
+        - This handler is belt-and-suspenders: it covers ContentPanel itself and any
+          future focusable children added to the view-mode layout.
+
+        The intent is that in view mode the NavTree always retains keyboard focus so
+        that arrow-key navigation keeps working after the user clicks to read content.
+        """
+        if not self.has_class("-editing") and not self.has_class("-editing-struct"):
+            event.prevent_default()
+            event.stop()
 
     # ── Public interface ───────────────────────────────────────────────────
 
