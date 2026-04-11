@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-04-11
+
+### Added
+- ⌥↑ / ⌥↓ section jump navigation in the NavTree — jumps cursor to the nearest section anchor (Roles, Milestones, Tasks, Context, Notes, AGENT.md, Skills)
+- Top-aligned scroll correction on initial session restore
+
 ## [0.4.0] - 2026-04-10
 
 ### Added
