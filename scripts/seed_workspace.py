@@ -12,7 +12,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import shutil
 from pathlib import Path
 
 
@@ -1371,30 +1370,6 @@ Not sure any of these are worth building right now. Maybe a quick spike on #1 si
     )
 
 
-def clean(target: Path) -> None:
-    """Delete all managed content so the seed starts from a clean slate.
-
-    Removes workspace data dirs, user data dirs, agent skills, and the session
-    file (which persists filters and cursor state). The session file lives one
-    level above coop_os/ — the project root.
-    """
-    workspace_dir = target / "workspace"
-    for managed_dir in (
-        workspace_dir / "roles",
-        workspace_dir / "milestones",
-        workspace_dir / "tasks",
-        target / "user" / "notes",
-        target / "user" / "context",
-        target / "agent" / "skills",
-    ):
-        if managed_dir.exists():
-            shutil.rmtree(managed_dir)
-
-    session_file = target.parent / ".coop-os-session.json"
-    if session_file.exists():
-        session_file.unlink()
-
-
 def main() -> None:
     repo_root = Path(__file__).parent.parent
     default_target = repo_root / "coop_os"
@@ -1416,9 +1391,6 @@ def main() -> None:
     args = parser.parse_args()
 
     target = Path(args.target)
-
-    print(f"Cleaning workspace at: {target}/")
-    clean(target)
 
     print(f"Seeding workspace at: {target}/")
 
