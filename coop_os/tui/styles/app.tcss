@@ -203,3 +203,14 @@ FixedHeader {
     color: $foreground;
     content-align: center middle;
 }
+
+/* ── Main layout (Vertical wrapper) ──────────────────────────────────────── */
+
+#main-layout {
+    height: 1fr;
+}
+
+#main-layout > Horizontal {
+    height: 1fr;
+}
+
