@@ -14,7 +14,7 @@ import frontmatter as _fm
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.events import Paste
 from textual.timer import Timer
@@ -99,9 +99,10 @@ class CoopOSApp(ActionsMixin, App[None]):
 
     def compose(self) -> ComposeResult:
         yield FixedHeader()
-        with Horizontal():
-            yield NavTree("coop-os", id="nav")
-            yield ContentPanel(id="content")
+        with Vertical(id="main-layout"):
+            with Horizontal():
+                yield NavTree("coop-os", id="nav")
+                yield ContentPanel(id="content")
         yield SplitFooter()
 
     def on_mount(self) -> None:
@@ -119,7 +120,6 @@ class CoopOSApp(ActionsMixin, App[None]):
             signal.signal(sig, self._on_termination_signal)
         self._file_snapshot.build()
         self._watcher_timer = self.set_interval(0.15, self._on_watch_tick, name="file-watcher")
-
     def _on_termination_signal(self, signum: int, frame: types.FrameType | None) -> None:
         self._save_session()
         signal.signal(signum, signal.SIG_DFL)
@@ -713,3 +713,4 @@ class CoopOSApp(ActionsMixin, App[None]):
 
     def action_show_keybindings(self) -> None:
         self.push_screen(KeybindingsScreen())
+

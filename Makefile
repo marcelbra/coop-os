@@ -1,4 +1,4 @@
-.PHONY: install lint format fix run test check sync-worktree seed-workspace clear-workspace reset-session
+.PHONY: install lint format fix run launch test check sync-worktree seed-workspace clear-workspace reset-session
 
 MAIN_REPO := $(shell git worktree list | head -1 | awk '{print $$1}')
 
@@ -6,6 +6,7 @@ install:  ## Install project dependencies
 	uv sync --group dev
 	git config core.hooksPath .githooks
 	npx --yes skills add ./coop_os/agent/skills --all
+	@[ "$$(uname)" = "Darwin" ] && brew install --cask iterm2 2>/dev/null || true
 
 lint:  ## Check for linting and type errors
 	uv run ruff check coop_os
@@ -28,6 +29,22 @@ sync-worktree:  ## Copy gitignored workspace/user state from the main worktree i
 
 run:  ## Start the TUI
 	uv run coop-os start
+
+launch:  ## Open iTerm2 with coop-os TUI in left pane and a shell in right pane
+	@osascript \
+	  -e 'tell application "iTerm2"' \
+	  -e '  activate' \
+	  -e '  set w to (create window with default profile)' \
+	  -e '  tell w' \
+	  -e '    tell current session of current tab' \
+	  -e '      set rightPane to (split vertically with default profile)' \
+	  -e '      write text "cd $(CURDIR) && make run"' \
+	  -e '    end tell' \
+	  -e '    tell rightPane' \
+	  -e '      write text "cd $(CURDIR)"' \
+	  -e '    end tell' \
+	  -e '  end tell' \
+	  -e 'end tell'
 
 seed-workspace:  ## Seed workspace with demo data (5 roles, 16 milestones, 30 tasks)
 	uv run scripts/seed_workspace.py
