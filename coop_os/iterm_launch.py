@@ -60,6 +60,19 @@ def write_iterm_profiles() -> None:
         "Blue Component": 0.0, "Alpha Component": 1.0, cs: "sRGB",
     }
 
+    # Ctrl+Shift+Arrow key bindings for switching focus between panes.
+    # Key format: "0x{unicode}-0x{modifier_flags}" where arrow keys carry the
+    # NumericPad flag (0x200000) in addition to Ctrl (0x40000) and Shift (0x20000).
+    # Action 18 = KEY_ACTION_SELECT_PANE_LEFT, 19 = KEY_ACTION_SELECT_PANE_RIGHT.
+    # iTerm2 intercepts these before forwarding to the terminal, so they work
+    # inside the Textual TUI without any TUI-side changes. Both actions are
+    # directional (no wrap-around): pressing right while already in the
+    # rightmost pane does nothing, and vice versa.
+    pane_switch_key_map = {
+        "0xf703-0x260000": {"Action": 19, "Text": ""},  # Ctrl+Shift+Right → Select Pane Right
+        "0xf702-0x260000": {"Action": 18, "Text": ""},  # Ctrl+Shift+Left  → Select Pane Left
+    }
+
     profiles = {"Profiles": [
         {
             "Name": "coop-os-tui",
@@ -72,6 +85,7 @@ def write_iterm_profiles() -> None:
             "Use Tab Color": True,
             "Title Components": 16,
             "Custom Title": "coop-os",
+            "Keyboard Map": pane_switch_key_map,
         },
         {
             "Name": "coop-os-agent",
@@ -84,6 +98,7 @@ def write_iterm_profiles() -> None:
             "Use Tab Color": True,
             "Title Components": 16,
             "Custom Title": "coop-os",
+            "Keyboard Map": pane_switch_key_map,
         },
     ]}
 
