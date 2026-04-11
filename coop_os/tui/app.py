@@ -199,7 +199,7 @@ class CoopOSApp(ActionsMixin, App[None]):
         assert self.sm.state is not None
         content = self.query_one(ContentPanel)
         if cursor_nav is not None and not content.is_editing:
-            tree.focus_nav(cursor_nav)
+            tree.focus_nav(cursor_nav, top_aligned=initial_expansion is not None)
         if selected is not None:
             self._show_view()
         if self.sm.state.errors:

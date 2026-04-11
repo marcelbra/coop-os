@@ -68,6 +68,7 @@ class NavTree(Tree[Nav | None]):
             disabled=disabled,
         )
         self._previous_visible_order: dict[tuple[str, str], list[str]] = {}
+        self._pending_escape: bool = False
 
     class EditRequested(Message):
         """User pressed → on a node and wants to enter edit mode."""
@@ -90,8 +91,31 @@ class NavTree(Tree[Nav | None]):
         event.prevent_default()
         event.stop()
 
+    def _consume_escape_sequence(self, event: Key) -> bool:
+        """Handle a key that follows a pending escape (Option+arrow sequence).
+
+        Returns True if the event was consumed as a section jump so the caller
+        can return early; False if the event should fall through to normal handling.
+        """
+        if not self._pending_escape:
+            return False
+        self._pending_escape = False
+        if event.key == "up":
+            self._handle_section_up(event)
+            return True
+        if event.key == "down":
+            self._handle_section_down(event)
+            return True
+        return False
+
     def on_key(self, event: Key) -> None:
-        if event.key == "right":
+        # Option+Up/Down arrives as two separate events: escape then up/down.
+        if self._consume_escape_sequence(event):
+            return
+        if event.key == "escape":
+            self._pending_escape = True
+            event.stop()
+        elif event.key == "right":
             self._handle_right(event)
         elif event.key == "left":
             self._handle_left(event)
@@ -99,6 +123,10 @@ class NavTree(Tree[Nav | None]):
             self._handle_up(event)
         elif event.key == "down":
             self._handle_down(event)
+        elif event.key == "alt+up":
+            self._handle_section_up(event)
+        elif event.key == "alt+down":
+            self._handle_section_down(event)
         elif event.key == "enter":
             self._handle_enter(event)
         # "n" and "d" are NOT consumed here — they bubble to App BINDINGS.
@@ -130,6 +158,14 @@ class NavTree(Tree[Nav | None]):
     def _is_interactive(self, node: TreeNode[Nav | None]) -> bool:
         data = node.data
         return data is not None and not is_decorative_nav(data)
+
+    def _is_section_anchor(self, node: TreeNode[Nav | None]) -> bool:
+        """Return True for the 7 named jump targets: Roles, Milestones, Tasks, Context, Notes, AGENT.md, Skills."""
+        data = node.data
+        return (
+            isinstance(data, StructuralNav) and data.kind == "section"
+            or isinstance(data, FileNav) and data.kind == "agent"
+        )
 
     def _handle_right(self, event: Key) -> None:
         node = self.cursor_node
@@ -221,6 +257,36 @@ class NavTree(Tree[Nav | None]):
                     return
             # Exhausted siblings at this level; climb and try the parent's siblings.
             current = parent
+        event.stop()
+
+    def _handle_section_up(self, event: Key) -> None:
+        """Jump the cursor to the nearest section anchor above the current position."""
+        visible = self._visible_nodes()
+        cursor = self.cursor_node
+        if not cursor or cursor not in visible:
+            event.stop()
+            return
+        current_idx = visible.index(cursor)
+        for node in reversed(visible[:current_idx]):
+            if self._is_section_anchor(node):
+                self.move_cursor(node)
+                event.stop()
+                return
+        event.stop()
+
+    def _handle_section_down(self, event: Key) -> None:
+        """Jump the cursor to the nearest section anchor below the current position."""
+        visible = self._visible_nodes()
+        cursor = self.cursor_node
+        if not cursor or cursor not in visible:
+            event.stop()
+            return
+        current_idx = visible.index(cursor)
+        for node in visible[current_idx + 1:]:
+            if self._is_section_anchor(node):
+                self.move_cursor(node)
+                event.stop()
+                return
         event.stop()
 
     def _handle_enter(self, event: Key) -> None:
@@ -490,22 +556,22 @@ class NavTree(Tree[Nav | None]):
             return next((n for n, fn in surviving if str(fn.path) == fallback_path), None)
         return None
 
-    def focus_nav(self, nav: Nav) -> None:
-        """Move the tree cursor to *nav*, keeping same-section fallback semantics."""
+    def _resolve_nav_target(self, nav: Nav) -> TreeNode[Nav | None] | None:
+        """Resolve *nav* to a tree node using same-section fallback semantics."""
         if isinstance(nav, StructuralNav) and nav.kind == "section":
-            target = self._find_section_node(nav.section)
-        else:
-            target = self._find_node(nav)
-            if target is None and isinstance(nav, ContentNav):
-                current_section_navs: list[ContentNav] = [
-                    node.data
-                    for node in self._visible_nodes()
-                    if isinstance(node.data, ContentNav) and node.data.section == nav.section
-                ]
-                previous_ids = self._previous_visible_order.get((nav.kind, nav.section), [])
-                fallback_nav = choose_same_section_neighbor(nav, previous_ids, current_section_navs)
-                if fallback_nav is not None:
-                    target = self._find_node(fallback_nav)
+            return self._find_section_node(nav.section) or self._first_navigable_node()
+
+        target = self._find_node(nav)
+        if target is None and isinstance(nav, ContentNav):
+            current_section_navs: list[ContentNav] = [
+                node.data
+                for node in self._visible_nodes()
+                if isinstance(node.data, ContentNav) and node.data.section == nav.section
+            ]
+            previous_ids = self._previous_visible_order.get((nav.kind, nav.section), [])
+            fallback_nav = choose_same_section_neighbor(nav, previous_ids, current_section_navs)
+            if fallback_nav is not None:
+                target = self._find_node(fallback_nav)
 
         if target is None and isinstance(nav, FileNav) and nav.kind in ("task_file", "task_dir"):
             target = self._find_file_neighbor_node(nav)
@@ -516,13 +582,37 @@ class NavTree(Tree[Nav | None]):
             elif isinstance(nav, FileNav) and nav.kind in ("task_file", "task_dir"):
                 target = self._find_section_node("tasks")
 
-        if target is None:
-            target = self._first_navigable_node()
+        return target or self._first_navigable_node()
 
+    def focus_nav(self, nav: Nav, top_aligned: bool = False) -> None:
+        """Move the tree cursor to *nav*, keeping same-section fallback semantics.
+
+        When *top_aligned* is True (initial session restore), corrects the scroll
+        after Textual's default scroll-to-cursor: keeps scroll_y=0 if the cursor
+        is already visible from the top, otherwise scrolls the minimum amount
+        needed to show the cursor at the bottom of the viewport.
+        """
+        target = self._resolve_nav_target(nav)
         if target is not None:
             self._expand_to(target)
             _ = self._tree_lines  # noqa: F841
             self.move_cursor(target)
+            if top_aligned:
+                self.app.call_after_refresh(self._apply_top_aligned_scroll)
+
+    def _apply_top_aligned_scroll(self) -> None:
+        """Correct scroll to be maximally top-aligned after initial cursor placement.
+
+        Keeps scroll_y=0 when the cursor is already visible from the top; otherwise
+        scrolls the minimum number of lines to bring the cursor into view at the
+        bottom of the viewport.
+        """
+        cursor_line: int = self.cursor_line
+        if cursor_line < 0:
+            return
+        visible_height: int = self.scrollable_content_region.height
+        target_scroll_y: int = max(0, cursor_line - visible_height + 1)
+        self.scroll_to(y=target_scroll_y, animate=False)
 
     def _find_section_node(self, section: str) -> TreeNode[Nav | None] | None:
         return next(

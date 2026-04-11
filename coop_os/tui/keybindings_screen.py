@@ -12,6 +12,7 @@ from textual.widgets import Label, Static
 _GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
     ("Navigation", [
         ("↑ / ↓", "move cursor"),
+        ("⌥↑ / ⌥↓", "jump to section"),
         ("space / enter", "expand or collapse"),
         ("enter", "edit item"),
     ]),
