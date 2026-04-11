@@ -5,11 +5,16 @@ import sys
 from pathlib import Path
 
 from coop_os.backend.store import ProjectStore
+from coop_os.iterm_launch import launch as iterm_launch
 from coop_os.tui import CoopOSApp
 
 
 def _cmd_start(root: Path) -> None:
     CoopOSApp(root=root).run()
+
+
+def _cmd_launch(root: Path, horizontal: bool) -> None:
+    iterm_launch(root, horizontal=horizontal)
 
 
 def _cmd_validate(root: Path) -> None:
@@ -38,6 +43,12 @@ def main() -> None:
     validate.add_argument("--root", type=Path, default=Path.cwd(),
                           help="Project root directory (default: cwd)")
 
+    launch = sub.add_parser("launch", help="Open iTerm2 with TUI and agent panes side by side")
+    launch.add_argument("--root", type=Path, default=Path.cwd(),
+                        help="Project root directory (default: cwd)")
+    launch.add_argument("--horizontal", action="store_true",
+                        help="Split top/bottom instead of left/right")
+
     args = p.parse_args()
     cmd: str | None = args.cmd
     root: Path = getattr(args, "root", Path.cwd())
@@ -46,6 +57,8 @@ def main() -> None:
         _cmd_start(root.resolve())
     elif cmd == "validate":
         _cmd_validate(root.resolve())
+    elif cmd == "launch":
+        _cmd_launch(root.resolve(), horizontal=args.horizontal)
     else:
         p.print_help()
 

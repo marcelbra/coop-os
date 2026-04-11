@@ -1,3 +1,5 @@
+agent_harness_command: claude
+
 task_statuses:
   todo: "○"
   in_progress: "◉"

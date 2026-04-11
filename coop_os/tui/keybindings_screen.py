@@ -28,6 +28,10 @@ _GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
         ("m", "filter milestones"),
         ("t", "filter tasks"),
     ]),
+    ("View", [
+        ("ctrl+t", "toggle sidebar"),
+        ("ctrl+s", "save file"),
+    ]),
     ("Other", [
         ("k", "keybindings"),
         ("q", "quit"),

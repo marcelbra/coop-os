@@ -30,23 +30,37 @@
 
 Collaboration welcome — see [Contributing](https://github.com/marcelbra/coop-os?tab=contributing-ov-file).
 
+## Requirements
+
+- Python 3.13+ (subject to downgrade)
+- [iTerm2](https://iterm2.com/) — required for the split-pane launch (TUI + agent side by side)
+
 ## Install
 
 ```bash
 pip install coop-os
 npx skills add marcelbra/coop-os
-coop-os start
+coop-os launch       # opens iTerm2 with TUI and agent panes side by side
 ```
 
 For local development:
 
 ```bash
 make install
-make run
+make run             # TUI only
+coop-os launch       # iTerm2 split-pane experience
 ```
 
-Requires Python 3.13+. Subject to downgrade.
+Pass `--horizontal` to `coop-os launch` for a top/bottom split instead of the default left/right.
 
+
+## Configuration
+
+`config.yml` in the project root controls runtime behaviour:
+
+```yaml
+agent_harness_command: claude   # command launched in the agent pane (e.g. claude, aider, gpte)
+```
 
 ## Collaboration
 
@@ -55,4 +69,4 @@ See [Contributing](https://github.com/marcelbra/coop-os?tab=contributing-ov-file
 
 ## Notes
 
-Currently only tested on Mac Silicon bash terminal.
+Currently only tested on Mac Silicon. Works in any terminal, but the full split-pane experience (TUI + agent side by side) requires iTerm2.

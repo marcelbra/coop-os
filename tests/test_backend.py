@@ -214,6 +214,21 @@ def test_role_status_roundtrip(tmp_path: Path) -> None:
     assert roles[0].status == RoleStatus.INACTIVE
 
 
+def test_role_duplicate_title_raises(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = RoleStore(root)
+    store.save(Role(id="role-1", title="Engineer"))
+    with pytest.raises(ValueError, match="role named 'Engineer' already exists"):
+        store.save(Role(id="role-2", title="Engineer"))
+
+
+def test_role_update_same_title_does_not_raise(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = RoleStore(root)
+    store.save(Role(id="role-1", title="Engineer"))
+    store.save(Role(id="role-1", title="Engineer"))  # update same ID — must not raise
+
+
 # ── MilestoneStore ────────────────────────────────────────────────────────────
 
 
@@ -257,6 +272,21 @@ def test_milestone_next_id(tmp_path: Path) -> None:
     assert store.next_id() == "milestone-1"
     store.save(Milestone(id="milestone-1", title="A"))
     assert store.next_id() == "milestone-2"
+
+
+def test_milestone_duplicate_title_raises(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = MilestoneStore(root)
+    store.save(Milestone(id="milestone-1", title="v1.0"))
+    with pytest.raises(ValueError, match="milestone named 'v1.0' already exists"):
+        store.save(Milestone(id="milestone-2", title="v1.0"))
+
+
+def test_milestone_update_same_title_does_not_raise(tmp_path: Path) -> None:
+    root = make_root(tmp_path)
+    store = MilestoneStore(root)
+    store.save(Milestone(id="milestone-1", title="v1.0"))
+    store.save(Milestone(id="milestone-1", title="v1.0"))  # update same ID — must not raise
 
 
 # ── TaskStore ─────────────────────────────────────────────────────────────────

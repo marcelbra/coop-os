@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-04-11
+
+### Added
+- `coop-os launch` command for iTerm2 split-pane experience — opens sidebar and content panes automatically (#142)
+- iTerm2 split-pane launch replaces embedded terminal panel (#139)
+- Ctrl+T sidebar toggle and Ctrl+S save (#138)
+- `make reset-session` target and accompanying script (#137)
+
+### Fixed
+- Content panel no longer steals focus in view mode (#141)
+- iTerm2 launch script with dynamic profiles and correct split-pane layout (#140)
+- Role/milestone IDs now stored in editor; unique default titles enforced (#136)
+
+### Changed
+- Skill files removed from `seed_workspace` script (#135)
+
 ## [0.5.0] - 2026-04-11
 
 ### Added

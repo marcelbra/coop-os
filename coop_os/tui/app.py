@@ -14,7 +14,7 @@ import frontmatter as _fm
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.events import Paste
 from textual.timer import Timer
@@ -78,6 +78,8 @@ class CoopOSApp(ActionsMixin, App[None]):
         Binding("d", "delete_item", "delete", show=False),
         Binding("ctrl+r", "refresh_state", "Refresh", show=False),
         Binding("k", "show_keybindings", "keys", show=False),
+        Binding("ctrl+t", "toggle_sidebar", "sidebar", show=False),
+        Binding("ctrl+s", "save_file", "save", show=False),
     ]
 
     def __init__(self, root: Path) -> None:
@@ -91,14 +93,16 @@ class CoopOSApp(ActionsMixin, App[None]):
         self._last_change_at: float = 0.0
         self._pending_changes: set[str] = set()
         self._watcher_timer: Timer | None = None
+        self._nav_visible: bool = True
 
     # ── Layout ────────────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
         yield FixedHeader()
-        with Horizontal():
-            yield NavTree("coop-os", id="nav")
-            yield ContentPanel(id="content")
+        with Vertical(id="main-layout"):
+            with Horizontal():
+                yield NavTree("coop-os", id="nav")
+                yield ContentPanel(id="content")
         yield SplitFooter()
 
     def on_mount(self) -> None:
@@ -116,7 +120,6 @@ class CoopOSApp(ActionsMixin, App[None]):
             signal.signal(sig, self._on_termination_signal)
         self._file_snapshot.build()
         self._watcher_timer = self.set_interval(0.15, self._on_watch_tick, name="file-watcher")
-
     def _on_termination_signal(self, signum: int, frame: types.FrameType | None) -> None:
         self._save_session()
         signal.signal(signum, signal.SIG_DFL)
@@ -294,6 +297,8 @@ class CoopOSApp(ActionsMixin, App[None]):
 
     @on(DetailTextArea.ExitRequested)
     def on_exit_requested(self) -> None:
+        if not self._nav_visible:
+            return
         self._exit_edit_mode()
 
     @on(StructuredEditor.Changed)
@@ -407,13 +412,14 @@ class CoopOSApp(ActionsMixin, App[None]):
 
     # ── Auto-save ─────────────────────────────────────────────────────────────
 
-    def _save_current(self) -> None:
+    def _save_current(self) -> bool:
+        """Save the currently edited file to disk. Returns True on success, False on failure."""
         content = self.query_one(ContentPanel)
         if not self.selected or not content.is_editing:
-            return
+            return False
         path = self._item_path()
         if not path:
-            return
+            return False
         new_text = content.editor_text
         try:
             path.write_text(new_text, encoding="utf-8")
@@ -426,8 +432,10 @@ class CoopOSApp(ActionsMixin, App[None]):
             else:
                 self._file_snapshot.mark_written(path)
             self._sync_state()
+            return True
         except Exception as e:
             self.notify(str(e), severity="error", timeout=4)
+            return False
 
     def _rename_to_match_title(self, current_path: Path, new_text: str) -> Path:
         """Rename file or task dir if the title no longer matches the path name.
@@ -680,5 +688,29 @@ class CoopOSApp(ActionsMixin, App[None]):
         self._reload()
         self.notify("Refreshed", severity="information", timeout=2)
 
+    def action_toggle_sidebar(self) -> None:
+        """Show/hide the NavTree. Does not steal focus from the editor when editing."""
+        tree = self.query_one(NavTree)
+        content = self.query_one(ContentPanel)
+        self._nav_visible = not self._nav_visible
+        if self._nav_visible:
+            tree.remove_class("-hidden")
+            if not content.is_editing:
+                tree.focus()
+        else:
+            tree.add_class("-hidden")
+
+    def action_save_file(self) -> None:
+        """Explicitly save the currently edited file. Noop when not editing."""
+        content = self.query_one(ContentPanel)
+        if not content.is_editing:
+            return
+        saved = self._save_current()
+        if saved:
+            path = self._item_path()
+            if path:
+                self.notify(f"Saved {path.name}", severity="information", timeout=2)
+
     def action_show_keybindings(self) -> None:
         self.push_screen(KeybindingsScreen())
+

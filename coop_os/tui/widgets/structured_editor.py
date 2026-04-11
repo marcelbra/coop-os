@@ -55,7 +55,9 @@ class StructuredEditor(Widget):
         self._kind = kind
 
         role_ids = [r.id for r in state.roles]
+        role_titles = [r.title for r in state.roles]
         milestone_ids = [m.id for m in state.milestones]
+        milestone_titles = [m.title for m in state.milestones]
 
         for attr_key, _label, kinds, _readonly in FIELD_DEFS:
             row = self.query_one(f"#se-row-{attr_key}")
@@ -67,7 +69,9 @@ class StructuredEditor(Widget):
 
                 widget = self.query_one(f"#se-inp-{attr_key}")
                 if attr_key in SELECT_FIELDS:
-                    options, display = self._build_select_options(attr_key, kind, cfg, role_ids, milestone_ids)
+                    options, display = self._build_select_options(
+                        attr_key, kind, cfg, role_ids, role_titles, milestone_ids, milestone_titles
+                    )
                     sel = cast(SelectInput, widget)
                     sel.set_options(options, display)
                     sel.value = val
@@ -131,9 +135,16 @@ class StructuredEditor(Widget):
         kind: str,
         cfg: AppConfig,
         role_ids: list[str],
+        role_titles: list[str],
         milestone_ids: list[str],
+        milestone_titles: list[str],
     ) -> tuple[list[str], list[str] | None]:
-        """Build options and optional display labels for a select field."""
+        """Build options and optional display labels for a select field.
+
+        For role and milestone fields, option values are IDs (what gets persisted to
+        disk) while display labels are titles (what the user sees). IDs are stable
+        across renames; titles are not.
+        """
         display: list[str] | None = None
         if attr_key == "status":
             if kind == "task":
@@ -146,8 +157,10 @@ class StructuredEditor(Widget):
             display = [f"{icons[s]} {s}" for s in options]
         elif attr_key == "role":
             options = [""] + role_ids
+            display = [""] + role_titles
         elif attr_key == "milestone":
             options = [""] + milestone_ids
+            display = [""] + milestone_titles
         else:  # scanned
             options = list(SCANNED_ICONS.keys())
             display = [f"{SCANNED_ICONS[s]} {s}" for s in options]
@@ -166,6 +179,9 @@ class StructuredEditor(Widget):
                 widget.add_class("se-view-disabled")
         ta = self.query_one("#se-body", BodyTextArea)
         ta.read_only = not editable
+        # Disable focus in view mode so clicking the body area doesn't steal
+        # focus from the NavTree (read_only prevents editing but not focusing).
+        ta.can_focus = editable
 
     def focus_first(self, select_all: bool = False) -> None:
         """Focus the first editable field (new items only) or the body (existing items)."""

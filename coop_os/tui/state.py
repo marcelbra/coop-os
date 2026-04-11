@@ -88,7 +88,9 @@ class StateManager:
         visible_role_ids = self.visible_role_ids()
 
         if self.role_filters:
-            reachable_milestones = {m.id for m in self.state.milestones if m.role is None or m.role in visible_role_ids}
+            reachable_milestones = {
+                m.id for m in self.state.milestones if m.role is None or m.role in visible_role_ids
+            }
             self.milestone_filters = self._prune_to_reachable(
                 self.milestone_filters, MilestoneStatus, reachable_milestones
             )

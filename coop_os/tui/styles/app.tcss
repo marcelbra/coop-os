@@ -1,6 +1,8 @@
 /* ── NavTree ──────────────────────────────────────────────────────────────── */
 /* Width must match _TREE_WIDTH in nav.py. */
 
+NavTree.-hidden { display: none; }
+
 NavTree {
     width: 30;
     min-width: 30;
@@ -201,3 +203,14 @@ FixedHeader {
     color: $foreground;
     content-align: center middle;
 }
+
+/* ── Main layout (Vertical wrapper) ──────────────────────────────────────── */
+
+#main-layout {
+    height: 1fr;
+}
+
+#main-layout > Horizontal {
+    height: 1fr;
+}
+

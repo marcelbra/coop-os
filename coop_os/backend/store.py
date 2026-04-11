@@ -199,6 +199,12 @@ class RoleStore(FlatFileStore[Role]):
     def _file_slug(self, item: Role) -> str:
         return item.title
 
+    def save(self, item: Role) -> None:
+        existing_roles, _ = self.load_all()
+        if any(r.title == item.title and r.id != item.id for r in existing_roles):
+            raise ValueError(f"A role named '{item.title}' already exists.")
+        super().save(item)
+
 
 class MilestoneStore(FlatFileStore[Milestone]):
     def __init__(self, root: Path) -> None:
@@ -229,6 +235,12 @@ class MilestoneStore(FlatFileStore[Milestone]):
 
     def _file_slug(self, item: Milestone) -> str:
         return item.title
+
+    def save(self, item: Milestone) -> None:
+        existing_milestones, _ = self.load_all()
+        if any(m.title == item.title and m.id != item.id for m in existing_milestones):
+            raise ValueError(f"A milestone named '{item.title}' already exists.")
+        super().save(item)
 
 
 class TaskStore:

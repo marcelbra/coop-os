@@ -93,6 +93,14 @@ def _prune_task_attachment(sm: StateManager, deleted_path: Path) -> None:
         sm.store.tasks.save(task.model_copy(update={"attachments": updated_attachments}))
 
 
+def _unique_default_title(prefix: str, starting_n: int, existing_titles: set[str]) -> str:
+    """Return the first title of the form '<prefix> N' not already in existing_titles."""
+    n = starting_n
+    while f"{prefix} {n}" in existing_titles:
+        n += 1
+    return f"{prefix} {n}"
+
+
 class ActionsMixin(_CoopOSHost):
     """CRUD and filter actions for CoopOSApp.
 
@@ -130,14 +138,20 @@ class ActionsMixin(_CoopOSHost):
         match section:
             case "roles":
                 new_id = self.sm.store.roles.next_id()
-                new_item = Role(id=new_id, title=f"Role {new_id.rsplit('-', 1)[-1]}")
+                role_title = _unique_default_title(
+                    "Role", int(new_id.rsplit("-", 1)[-1]), {r.title for r in self.sm.state.roles}
+                )
+                new_item = Role(id=new_id, title=role_title)
                 self.sm.store.roles.save(new_item)
                 selected = ContentNav("role", new_item.id, "roles")
             case "milestones":
                 new_id = self.sm.store.milestones.next_id()
+                milestone_title = _unique_default_title(
+                    "Milestone", int(new_id.rsplit("-", 1)[-1]), {m.title for m in self.sm.state.milestones}
+                )
                 new_item = Milestone(
                     id=new_id,
-                    title=f"Milestone {new_id.rsplit('-', 1)[-1]}",
+                    title=milestone_title,
                     start_date=today,
                     end_date="",
                 )
