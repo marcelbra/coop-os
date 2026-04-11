@@ -1,4 +1,4 @@
-.PHONY: install lint format fix run test check sync-worktree seed-workspace clear-workspace
+.PHONY: install lint format fix run test check sync-worktree seed-workspace clear-workspace reset-session
 
 MAIN_REPO := $(shell git worktree list | head -1 | awk '{print $$1}')
 
@@ -34,6 +34,9 @@ seed-workspace:  ## Seed workspace with demo data (5 roles, 16 milestones, 30 ta
 
 clear-workspace:  ## Delete all workspace context (roles, milestones, tasks, user data, session)
 	uv run scripts/clear_workspace.py
+
+reset-session:  ## Reset session state (filters, expansions, cursor) without touching workspace content
+	uv run scripts/reset_session.py
 
 help:  ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
