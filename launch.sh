@@ -15,18 +15,23 @@ done
 # Disable inactive pane dimming
 defaults write com.googlecode.iterm2 DimInactiveSplitPanes -bool false
 
-# Write Dynamic Profiles. Reads the Default profile font and scales TUI pane to 150%.
-python3 "$DIR/scripts/write_iterm_profiles.py"
+# Write Dynamic Profiles.
+"$DIR/.venv/bin/python" "$DIR/scripts/write_iterm_profiles.py"
 
 # Read agent command from config.yml
 AGENT_CMD=$(awk -F': ' '/^agent_harness_command:/{gsub(/"/, "", $2); print $2; exit}' "$DIR/config.yml")
 AGENT_CMD="${AGENT_CMD:-claude}"
 
-# Activate iTerm2 first and wait for it to load the Dynamic Profiles
-osascript -e 'tell application "iTerm2" to activate'
-sleep 1
+# If not already inside iTerm, launch it and wait for it to be ready.
+if [ "${TERM_PROGRAM}" != "iTerm.app" ]; then
+    if ! pgrep -xq iTerm2; then
+        open -a iTerm
+        until pgrep -xq iTerm2; do sleep 0.3; done
+        sleep 2
+    fi
+fi
 
-# Create window, split panes, write startup commands, and maximize
+# Create window, split panes, write startup commands, and maximize.
 osascript \
   -e 'tell application "Finder" to set screenBounds to bounds of window of desktop' \
   -e 'tell application "iTerm2"' \
@@ -43,3 +48,8 @@ osascript \
   -e '  end tell' \
   -e '  set bounds of w to screenBounds' \
   -e 'end tell'
+
+# If launched from outside iTerm, bring it to the front now.
+if [ "${TERM_PROGRAM}" != "iTerm.app" ]; then
+    open -a iTerm
+fi
