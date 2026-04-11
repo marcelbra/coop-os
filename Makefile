@@ -30,21 +30,8 @@ sync-worktree:  ## Copy gitignored workspace/user state from the main worktree i
 run:  ## Start the TUI
 	uv run coop-os start
 
-launch:  ## Open iTerm2 with coop-os TUI in left pane and a shell in right pane
-	@osascript \
-	  -e 'tell application "iTerm2"' \
-	  -e '  activate' \
-	  -e '  set w to (create window with default profile)' \
-	  -e '  tell w' \
-	  -e '    tell current session of current tab' \
-	  -e '      set rightPane to (split vertically with default profile)' \
-	  -e '      write text "cd $(CURDIR) && make run"' \
-	  -e '    end tell' \
-	  -e '    tell rightPane' \
-	  -e '      write text "cd $(CURDIR)"' \
-	  -e '    end tell' \
-	  -e '  end tell' \
-	  -e 'end tell'
+launch:  ## Open iTerm2 maximized, vertical split by default. Use SPLIT=h for horizontal (top/bottom).
+	@bash "$(CURDIR)/launch.sh" $(if $(filter h,$(SPLIT)),-h,-v)
 
 seed-workspace:  ## Seed workspace with demo data (5 roles, 16 milestones, 30 tasks)
 	uv run scripts/seed_workspace.py
