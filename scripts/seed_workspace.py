@@ -2,7 +2,7 @@
 """Seed a fresh coop-os workspace with realistic demo data.
 
 Creates 5 roles, 16 milestones, 30 tasks (some nested), agent config,
-5 skills, user context documents, and 2 unscanned notes.
+user context documents, and 2 unscanned notes.
 
 Usage:
     uv run scripts/seed_workspace.py
@@ -998,176 +998,6 @@ At the start of every session (unless a skill is triggered immediately):
 """,
     )
 
-    write_file(
-        agent_dir / "skills" / "check-in" / "SKILL.md",
-        """\
----
-description: Daily morning check-in. Reviews calendar, email, and active tasks to
-  surface the top 3 priorities and the single most important thing for the day.
-name: check-in
----
-
-## Steps
-
-1. **Check calendar**
-   - Pull today's events via Google Calendar
-   - Note hard commitments, deadlines, or energy-heavy blocks
-
-2. **Check email**
-   - Scan Gmail for anything urgent or requiring action today
-   - Only surface what matters — don't summarize everything
-
-3. **Check tasks**
-   - Read task files in `tasks/` with status `in_progress`
-   - Read task files in `tasks/` with status `todo`
-   - Identify what's overdue, what's closest to done, what aligns with today's energy
-
-4. **Synthesize and present**
-   - Lead with: what's the one most important thing today?
-   - Surface top 3 priorities (not more)
-   - Flag anything urgent from email or calendar
-
-5. **Open the floor**
-   - End with: "What's on your mind?" or "Anything to add before we dive in?"
-""",
-    )
-
-    write_file(
-        agent_dir / "skills" / "check-out" / "SKILL.md",
-        """\
----
-description: Daily end-of-day check-out. Reviews what moved, captures loose ends,
-  flags blockers, and previews tomorrow's priorities.
-name: check-out
----
-
-## Steps
-
-1. **Review today's tasks**
-   - What moved from `todo` to `done` or `in_progress`?
-   - What was planned but didn't happen? Why?
-
-2. **Capture loose ends**
-   - Any decisions made that should be written down?
-   - Any new tasks or ideas that surfaced today?
-
-3. **Flag blockers**
-   - Is anything `waiting` on someone else?
-   - Is any `in_progress` task stuck? What's the blocker?
-
-4. **Preview tomorrow**
-   - What are the top 3 things for tomorrow?
-   - Any calendar blocks or constraints to account for?
-
-5. **Close out**
-   - End with: "Good work today. See you tomorrow."
-""",
-    )
-
-    write_file(
-        agent_dir / "skills" / "scan-notes" / "SKILL.md",
-        """\
----
-description: Process unscanned notes into tasks and milestones. Reads notes with
-  scanned:false frontmatter, proposes actions, and marks them as processed.
-name: scan-notes
----
-
-## Steps
-
-1. **Load unscanned notes**
-   - Read all files in `notes/` where frontmatter has `scanned: false`
-   - If none found, say so and stop
-
-2. **For each unscanned note**, analyze the content and identify what actions make sense:
-   - **Create task** — something specific to do (include suggested title, milestone, labels)
-   - **Create milestone** — a new multi-month goal area emerging
-   - **No action** — just informational, archive as-is
-
-3. **Present proposals grouped by note**
-   - Show the note title and date
-   - List each proposed action with enough detail to act on
-   - Ask: "Do these look right? Anything to skip or change?"
-
-4. **Execute approved actions**
-   - Create tasks: place at `tasks/{next_id}-{title}/description.md`
-   - Create milestones: place at `milestones/{next_id}-{title}.md`
-
-5. **Mark notes as scanned**
-   - Set `scanned: true` in the frontmatter of each processed note file
-""",
-    )
-
-    write_file(
-        agent_dir / "skills" / "weekly-review" / "SKILL.md",
-        """\
----
-description: Weekly review workflow. Best done Sunday evening or Friday afternoon.
-  Covers task progress, habits, goal tracking, and next-week planning.
-name: weekly-review
----
-
-## Steps
-
-1. **Review the week**
-   - Which tasks moved to `done` this week?
-   - Which stalled or were deferred? Why?
-   - Any milestones completed or significantly advanced?
-
-2. **Check habits**
-   - Review `recurring-habits.md` — which habits hit target frequency?
-   - Note wins and misses without judgment
-
-3. **Check milestone health**
-   - Any milestones with no progress this week?
-   - Anything stalling that needs a decision or action?
-
-4. **Plan next week**
-   - What are the 3–5 most important things next week?
-   - Block time for deep work if needed
-
-5. **Capture reflections**
-   - What went well? What would you change?
-   - Any patterns worth noting?
-""",
-    )
-
-    write_file(
-        agent_dir / "skills" / "workspace-setup" / "SKILL.md",
-        """\
----
-description: Bootstrap or expand a coop-os workspace. Gathers context, drafts the
-  hierarchy, confirms with user, then creates files.
-name: workspace-setup
----
-
-## Steps
-
-1. **Gather context**
-   - Ask: What are your main life areas right now?
-   - Ask: What are you actively working toward in each area?
-   - Ask: Any existing notes or lists to import?
-
-2. **Draft hierarchy**
-   - Propose roles (5–8 life areas)
-   - Propose milestones per role (1–3 per role, active goals only)
-   - Propose seed tasks for any clear next actions
-
-3. **Confirm with user**
-   - Show the full proposed structure before creating anything
-   - Ask: "Does this feel right? Anything to add, remove, or rename?"
-
-4. **Create files**
-   - Write role files to `coop_os/workspace/roles/`
-   - Write milestone files to `coop_os/workspace/milestones/`
-   - Write task directories to `coop_os/workspace/tasks/`
-
-5. **Wrap up**
-   - Summarize what was created
-   - Suggest: run `check-in` to activate the workspace
-""",
-    )
-
 
 def seed_user(coop_os_dir: Path) -> None:
     user_dir = coop_os_dir / "user"
@@ -1405,7 +1235,6 @@ def main() -> None:
     print(f"  roles:      5   → {workspace_dir}/roles/")
     print(f"  milestones: 16  → {workspace_dir}/milestones/")
     print(f"  tasks:      30  → {workspace_dir}/tasks/")
-    print(f"  skills:     5   → {target}/agent/skills/")
     print(f"  user docs:  4   → {target}/user/context/")
     print(f"  notes:      2   → {target}/user/notes/")
 
