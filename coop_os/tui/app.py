@@ -666,9 +666,9 @@ class CoopOSApp(ActionsMixin, App[None]):
             editing_path = self._item_path()
             if editing_path and str(editing_path) in changed_paths:
                 self.notify(
-                    f"'{editing_path.name}' was updated — reloading.",
-                    severity="information",
-                    timeout=4.0,
+                    f"'{editing_path.name}' was updated on disk — your unsaved edits were overwritten.",
+                    severity="warning",
+                    timeout=6.0,
                 )
                 self._clear_edit_classes()
                 self._update_footer_hints(self.selected)
