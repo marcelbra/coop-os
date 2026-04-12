@@ -55,6 +55,11 @@ class FieldInput(Input):
             event.stop()
             self.action_cursor_right_word(True)
             return
+        elif event.key == "alt+backspace":
+            event.prevent_default()
+            event.stop()
+            self.action_delete_left_word()
+            return
 
         if event.key == "up":
             event.prevent_default()

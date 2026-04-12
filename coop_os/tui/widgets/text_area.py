@@ -43,6 +43,12 @@ class DetailTextArea(TextArea):
             action(select)
             return
 
+        if event.key == "alt+backspace":
+            event.prevent_default()
+            event.stop()
+            self.action_delete_word_left()
+            return
+
         if event.key == "tab":
             event.prevent_default()
             event.stop()
