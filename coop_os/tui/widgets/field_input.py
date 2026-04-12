@@ -25,7 +25,6 @@ class FieldInput(Input):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.select_on_next_focus: bool = False
-        self._escape_prefix: bool = False
 
     def on_focus(self) -> None:
         if self.select_on_next_focus:
@@ -35,25 +34,27 @@ class FieldInput(Input):
             self.call_after_refresh(self.action_home)
 
     def on_key(self, event: Key) -> None:
-        # macOS terminals send option+shift+arrow as ESC followed by a plain
-        # arrow. Track the ESC so the next left/right arrow triggers
-        # word-by-word selection instead of a single character move.
-        if event.key == "escape":
-            self._escape_prefix = True
+        # Textual delivers Option+arrow as alt+arrow (single event).
+        if event.key == "alt+left":
+            event.prevent_default()
+            event.stop()
+            self.action_cursor_left_word(False)
             return
-
-        if self._escape_prefix:
-            self._escape_prefix = False
-            if event.key == "left":
-                event.prevent_default()
-                event.stop()
-                self.action_cursor_left_word(True)
-                return
-            elif event.key == "right":
-                event.prevent_default()
-                event.stop()
-                self.action_cursor_right_word(True)
-                return
+        elif event.key == "alt+right":
+            event.prevent_default()
+            event.stop()
+            self.action_cursor_right_word(False)
+            return
+        elif event.key == "alt+shift+left":
+            event.prevent_default()
+            event.stop()
+            self.action_cursor_left_word(True)
+            return
+        elif event.key == "alt+shift+right":
+            event.prevent_default()
+            event.stop()
+            self.action_cursor_right_word(True)
+            return
 
         if event.key == "up":
             event.prevent_default()

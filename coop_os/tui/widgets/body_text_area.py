@@ -22,12 +22,9 @@ class BodyTextArea(DetailTextArea):
         self.highlight_cursor_line = False
 
     def on_key(self, event: Key) -> None:
-        # Snapshot the flag before super() consumes it. If the up key was the
-        # second event of an option+shift+up sequence (ESC then up), we must
-        # not treat it as "plain up at row 0 → navigate to fields".
-        was_escape_prefix = self._escape_prefix
         super().on_key(event)
-        if event.key == "up" and self.cursor_location[0] == 0 and not was_escape_prefix:
+        # alt+up is its own key name so it won't match "up" — no extra guard needed.
+        if event.key == "up" and self.cursor_location[0] == 0:
             event.prevent_default()
             event.stop()
             self.post_message(FieldInput.Navigate(-1))

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from textual.binding import Binding
 from textual.events import Key
 from textual.message import Message
@@ -18,45 +20,28 @@ class DetailTextArea(TextArea):
     class ExitRequested(Message):
         """User wants to leave edit mode."""
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._escape_prefix: bool = False
-
     def on_mount(self) -> None:
         self.styles.scrollbar_size_vertical = 0
         self.styles.scrollbar_size_horizontal = 0
 
     def on_key(self, event: Key) -> None:
-        # macOS terminals send option+shift+arrow as ESC followed by a plain
-        # arrow. We track the ESC and convert the next arrow into a selection
-        # action so that option+shift+left/right selects word-by-word and
-        # option+shift+up/down extends the selection line-by-line.
-        if event.key == "escape":
-            self._escape_prefix = True
+        # Textual delivers Option+arrow as alt+arrow (single event).
+        alt_actions: dict[str, tuple[Callable[[bool], None], bool]] = {
+            "alt+left": (self.action_cursor_word_left, False),
+            "alt+right": (self.action_cursor_word_right, False),
+            "alt+shift+left": (self.action_cursor_word_left, True),
+            "alt+shift+right": (self.action_cursor_word_right, True),
+            "alt+up": (self.action_cursor_up, False),
+            "alt+down": (self.action_cursor_down, False),
+            "alt+shift+up": (self.action_cursor_up, True),
+            "alt+shift+down": (self.action_cursor_down, True),
+        }
+        if event.key in alt_actions:
+            action, select = alt_actions[event.key]
+            event.prevent_default()
+            event.stop()
+            action(select)
             return
-
-        if self._escape_prefix:
-            self._escape_prefix = False
-            if event.key == "left":
-                event.prevent_default()
-                event.stop()
-                self.action_cursor_word_left(True)
-                return
-            elif event.key == "right":
-                event.prevent_default()
-                event.stop()
-                self.action_cursor_word_right(True)
-                return
-            elif event.key == "up":
-                event.prevent_default()
-                event.stop()
-                self.action_cursor_up(True)
-                return
-            elif event.key == "down":
-                event.prevent_default()
-                event.stop()
-                self.action_cursor_down(True)
-                return
 
         if event.key == "tab":
             event.prevent_default()
