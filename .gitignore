@@ -30,3 +30,7 @@ coop_os/workspace/tasks/*
 
 # Local specs (not tracked)
 specs/
+
+# Skills (local, not tracked)
+skills/
+skills-lock.json
