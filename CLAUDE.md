@@ -108,7 +108,11 @@ git clone git@github-personal:marcelbra/repo.git
 git clone git@github-work:workorg/repo.git
 ```
 
-This repo uses `github-personal`. The `gh` CLI manages its own auth separately and is already configured with both accounts.
+This repo uses `github-personal`. The `gh` CLI stores its auth separately from SSH (in `~/.config/gh/hosts.yml`), so it's a per-machine setup that can drift from the SSH config. Each account needs its own login run — a fresh machine has no `gh` auth until you do this for each account you need:
+
+```
+gh auth login --hostname github.com
+```
 
 ## Development Commands
 
