@@ -1,4 +1,4 @@
-.PHONY: install skills lint format fix run launch test check sync-worktree seed-workspace clear-workspace reset-session
+.PHONY: install skills lint format fix run test check sync-worktree seed-workspace clear-workspace reset-session
 
 MAIN_REPO := $(shell git worktree list | head -1 | awk '{print $$1}')
 
@@ -6,7 +6,6 @@ install:  ## Install project dependencies
 	uv sync --group dev
 	git config core.hooksPath .githooks
 	$(MAKE) skills
-	@[ "$$(uname)" = "Darwin" ] && brew install --cask iterm2 2>/dev/null || true
 
 skills:  ## Install agent skills into .claude/skills/ (requires npx)
 	@command -v npx >/dev/null 2>&1 || { \
@@ -36,9 +35,6 @@ sync-worktree:  ## Copy gitignored workspace/user state from the main worktree i
 
 run:  ## Start the TUI
 	uv run coop-os start
-
-launch:  ## Open iTerm2 maximized, vertical split by default. Use SPLIT=h for horizontal (top/bottom).
-	@bash "$(CURDIR)/launch.sh" $(if $(filter h,$(SPLIT)),-h,-v)
 
 seed-workspace:  ## Seed workspace with demo data (5 roles, 16 milestones, 30 tasks)
 	uv run scripts/seed_workspace.py

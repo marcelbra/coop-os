@@ -34,25 +34,23 @@ Collaboration welcome — see [Contributing](https://github.com/marcelbra/coop-o
 
 - Python 3.13+ (subject to downgrade)
 - Node.js / `npx` — required to install agent skills (`npx skills add ...`)
-- [iTerm2](https://iterm2.com/) — required for the split-pane launch (TUI + agent side by side)
 
 ## Install
 
 ```bash
 pip install coop-os
 npx skills add marcelbra/coop-os
-coop-os launch       # opens iTerm2 with TUI and agent panes side by side
+coop-os start        # launch the TUI
 ```
 
 For local development:
 
 ```bash
 make install
-make run             # TUI only
-coop-os launch       # iTerm2 split-pane experience
+make run             # start the TUI
 ```
 
-Pass `--horizontal` to `coop-os launch` for a top/bottom split instead of the default left/right.
+To work with an agent alongside the TUI, open a second terminal window (or tmux/wezterm pane) and run your agent harness there (e.g. `claude`).
 
 
 ## Configuration
@@ -60,7 +58,7 @@ Pass `--horizontal` to `coop-os launch` for a top/bottom split instead of the de
 `config.yml` in the project root controls runtime behaviour:
 
 ```yaml
-agent_harness_command: claude   # command launched in the agent pane (e.g. claude, aider, gpte)
+agent_harness_command: claude   # preferred agent harness to run alongside the TUI
 ```
 
 ## Collaboration
@@ -70,4 +68,4 @@ See [Contributing](https://github.com/marcelbra/coop-os?tab=contributing-ov-file
 
 ## Notes
 
-Currently only tested on Mac Silicon. Works in any terminal, but the full split-pane experience (TUI + agent side by side) requires iTerm2.
+Currently only tested on Mac Silicon. The TUI runs in any terminal emulator (Terminal.app, iTerm2, wezterm, Alacritty, etc.).
