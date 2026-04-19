@@ -9,11 +9,37 @@ from coop_os.iterm_launch import launch as iterm_launch
 from coop_os.tui import CoopOSApp
 
 
+def _ensure_skills_installed(root: Path) -> None:
+    """Abort with a clear message if agent skills are not installed at ``<root>/.claude/skills``.
+
+    Skills are shipped as source under ``coop_os/agent/skills`` and must be installed into
+    the project's ``.claude/skills`` directory via the ``skills`` npm CLI before the app can run.
+    """
+    skills_dir = root / ".claude" / "skills"
+    if skills_dir.is_dir() and any(skills_dir.iterdir()):
+        return
+    message_lines = [
+        "error: agent skills are not installed.",
+        f"  expected directory: {skills_dir}",
+        "",
+        "Install them with one of:",
+        "  npx skills add marcelbra/coop-os                    # from PyPI",
+        "  npx --yes skills add ./coop_os/agent/skills --all   # from a clone",
+        "  make install                                        # from a clone (runs the above)",
+        "",
+        "Requires Node.js / npx: https://nodejs.org",
+    ]
+    print("\n".join(message_lines), file=sys.stderr)
+    sys.exit(1)
+
+
 def _cmd_start(root: Path) -> None:
+    _ensure_skills_installed(root)
     CoopOSApp(root=root).run()
 
 
 def _cmd_launch(root: Path, horizontal: bool) -> None:
+    _ensure_skills_installed(root)
     iterm_launch(root, horizontal=horizontal)
 
 

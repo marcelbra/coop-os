@@ -19,10 +19,12 @@ name: workspace-setup
    - Show the full proposed structure before creating anything
    - Ask: "Does this feel right? Anything to add, remove, or rename?"
 
-4. **Create files**
-   - Write role files to `coop_os/workspace/roles/`
-   - Write milestone files to `coop_os/workspace/milestones/`
-   - Write task directories to `coop_os/workspace/tasks/`
+4. **Create files** — follow the Authoring Workflow and Workspace Schema in `AGENT.md`:
+   - For every file: draft → confirm with user → write → validate (hook auto-runs `uv run coop-os validate`) → fix and re-validate until clean
+   - Roles: `workspace/roles/role-{n}-{title}.md`
+   - Milestones: `workspace/milestones/milestone-{n}-{title}.md`
+   - Tasks: `workspace/tasks/task-{n}-{title}/description.md`
+   - Use the typed-ID format, valid status enums, and `end_date` (not `deadline`) as documented in `AGENT.md`
 
 5. **Wrap up**
    - Summarize what was created

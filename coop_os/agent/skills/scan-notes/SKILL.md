@@ -19,9 +19,11 @@ name: scan-notes
    - List each proposed action with enough detail to act on
    - Ask: "Do these look right? Anything to skip or change?"
 
-4. **Execute approved actions**
-   - Create tasks: place at `tasks/{next_id}-{title}/description.md`
-   - Create milestones: place at `milestones/{next_id}-{title}.md`
+4. **Execute approved actions** — follow the Authoring Workflow and Workspace Schema in `AGENT.md`:
+   - Draft → confirm → write → validate (hook auto-runs `uv run coop-os validate`)
+   - Tasks live at `tasks/task-{n}-{title}/description.md`
+   - Milestones live at `milestones/milestone-{n}-{title}.md`
+   - Use the typed-ID format and valid status enums documented in `AGENT.md`
 
 5. **Mark notes as scanned**
    - Set `scanned: true` in the frontmatter of each processed note file

@@ -33,6 +33,7 @@ Collaboration welcome — see [Contributing](https://github.com/marcelbra/coop-o
 ## Requirements
 
 - Python 3.13+ (subject to downgrade)
+- Node.js / `npx` — required to install agent skills (`npx skills add ...`)
 - [iTerm2](https://iterm2.com/) — required for the split-pane launch (TUI + agent side by side)
 
 ## Install

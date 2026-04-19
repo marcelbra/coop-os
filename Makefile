@@ -1,12 +1,19 @@
-.PHONY: install lint format fix run launch test check sync-worktree seed-workspace clear-workspace reset-session
+.PHONY: install skills lint format fix run launch test check sync-worktree seed-workspace clear-workspace reset-session
 
 MAIN_REPO := $(shell git worktree list | head -1 | awk '{print $$1}')
 
 install:  ## Install project dependencies
 	uv sync --group dev
 	git config core.hooksPath .githooks
-	npx --yes skills add ./coop_os/agent/skills --all
+	$(MAKE) skills
 	@[ "$$(uname)" = "Darwin" ] && brew install --cask iterm2 2>/dev/null || true
+
+skills:  ## Install agent skills into .claude/skills/ (requires npx)
+	@command -v npx >/dev/null 2>&1 || { \
+		echo "error: 'npx' not found. Install Node.js (https://nodejs.org) to set up agent skills." >&2; \
+		exit 1; \
+	}
+	npx --yes skills add ./coop_os/agent/skills --all
 
 lint:  ## Check for linting and type errors
 	uv run ruff check coop_os

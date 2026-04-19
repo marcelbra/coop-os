@@ -11,7 +11,7 @@ name: weekly-review
    - Any milestones completed or significantly advanced?
 
 2. **Check habits**
-   - Review `recurring-habits.md` — which habits hit target frequency?
+   - Review the Recurring habits context (`user/context/context-3-Recurring habits.md`) — which habits hit target frequency?
    - Note wins and misses without judgment
 
 3. **Check milestone health**
