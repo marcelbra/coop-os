@@ -1,4 +1,4 @@
-.PHONY: install skills lint format fix run test check sync-worktree seed-workspace clear-workspace reset-session
+.PHONY: install skills lint format fix run run-isolated test check sync-worktree seed-workspace clear-workspace reset-session
 
 MAIN_REPO := $(shell git worktree list | head -1 | awk '{print $$1}')
 
@@ -33,7 +33,10 @@ sync-worktree:  ## Copy gitignored workspace/user state from the main worktree i
 	cp -r $(MAIN_REPO)/coop_os/workspace coop_os/
 	cp -r $(MAIN_REPO)/coop_os/user coop_os/
 
-run:  ## Start the TUI
+run:  ## Start the TUI against the main checkout's workspace (same data from any worktree)
+	uv run coop-os start --root $(MAIN_REPO)
+
+run-isolated:  ## Start the TUI against the current directory's workspace (worktree copy)
 	uv run coop-os start
 
 seed-workspace:  ## Seed workspace with demo data (5 roles, 16 milestones, 30 tasks)
