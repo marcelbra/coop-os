@@ -21,19 +21,37 @@ Two long-lived branches:
 
 ### Day-to-day: feature → develop
 
-1. **Before starting any work**, ask the user: "Do you want to work in a worktree (isolated) or directly on the project?" Wait for their answer before proceeding.
-2. If worktree: call `EnterWorktree` with the branch name (following naming conventions above) — this creates an isolated worktree, then immediately run `make sync-worktree` to copy gitignored workspace/user state from the main worktree. If direct: create and check out the branch manually with `git checkout -b <branch> origin/develop`.
-3. Make focused, atomic commits
-4. If in a worktree: call `ExitWorktree` after committing — it cleans up automatically. Then push to `origin`. If direct: push to `origin`: `git push origin <branch>`.
-5. Open PR against `develop` on `marcelbra/coop-os`:
-   ```
-   gh pr create --repo marcelbra/coop-os --base develop --head <branch>
-   ```
-6. Group changes by concern — one logical unit per PR
+Every agent-driven change lands via a PR. The agent **always** works in an isolated worktree — never directly on the main checkout. When the work is done it pushes the branch, opens the PR, drops the worktree, and stops. The user reviews and merges at their own pace.
 
-Use squash merge — wait for CI first, then: `gh pr merge <n> --repo marcelbra/coop-os --squash --delete-branch --admin`
+1. **Create the worktree.** Call `EnterWorktree` with the branch name (following the naming table above). The worktree's `make run` points at the main checkout's workspace via `--root $(MAIN_REPO)`, so live data is available without `make sync-worktree`.
+2. **Do the work** in focused, atomic commits. The agent owns correctness — run `make check` before committing and fix anything it flags. No user confirmation is required before `git commit`.
+3. **Push the branch** from inside the worktree: `git push -u origin <branch>`.
+4. **Open the PR** against `develop`:
+   ```
+   gh pr create --repo marcelbra/coop-os --base develop --head <branch> --title "..." --body "..."
+   ```
+   Surface the PR URL in the response to the user.
+5. **Drop the worktree** once the PR URL has been captured:
+   ```
+   ExitWorktree(action=remove, discard_changes=true)
+   ```
+   `discard_changes=true` is safe here because every commit has been pushed to `origin` — the local branch holds no unique state.
+6. **Stop.** Do not merge. The user reviews on GitHub or checks the branch out in the main tree (`git fetch && git checkout <branch>`) whenever convenient.
 
-After merging, switch to develop and pull: `git checkout develop && git pull origin develop`
+Group changes by concern — one logical unit per PR. If a session produces unrelated work streams, open two PRs (sequentially, one worktree at a time).
+
+### Handling PR feedback
+
+When the user asks for changes on an existing PR, the worktree is already gone. Recreate one tracking the remote branch:
+
+1. `git fetch origin`
+2. Recreate the worktree from the remote branch:
+   ```
+   git worktree add .claude/worktrees/<slug> origin/<branch>
+   ```
+   Then `EnterWorktree(path=.claude/worktrees/<slug>)` to enter it.
+3. Make the requested changes, `git push` (no `-u` — the branch already tracks origin), confirm the PR shows the new commits.
+4. Drop the worktree again via `ExitWorktree(action=remove, discard_changes=true)`.
 
 ### Releasing: develop → main
 
@@ -59,22 +77,15 @@ When `develop` is stable and ready to ship:
 
 ### Merging rules
 
-**Always wait for CI before merging.** After creating a PR, run `gh pr checks <n> --repo marcelbra/coop-os --watch` and wait for all checks to pass. Only then merge with `--admin`. Never merge while checks are failing or pending.
+**The user merges; the agent does not.** The agent's responsibility ends at "PR pushed and linked in the response." The user reviews at their pace and either merges or requests changes.
 
-**Always ask the user to review and test before committing.** After implementing:
-1. Show what changed
-2. Run `make check` — if it passes, prompt the user to test
-3. Give them the exact commands to run in a new terminal window, as two lines:
-   ```
-   cd <worktree-path>
-   make run
-   ```
-4. Describe exactly what to verify — e.g. "You should see a bold orange `·` next to any task that has child tasks."
-5. Wait for explicit confirmation before running `git commit`
+When the user explicitly asks to merge a PR:
 
-Only after confirmation: commit, push, open the PR, and merge — all in one uninterrupted workflow.
+1. Wait for CI: `gh pr checks <n> --repo marcelbra/coop-os --watch`. Never merge while checks are failing or pending.
+2. Squash-merge with admin and branch cleanup: `gh pr merge <n> --repo marcelbra/coop-os --squash --delete-branch --admin`.
+3. Pull develop locally: `git checkout develop && git pull origin develop`.
 
-**Always merge immediately after creating a PR.** Don't wait for further confirmation after the user has already approved — create the PR and merge it in the same workflow.
+**Testing.** The agent self-tests via `make check` before opening the PR. For UI or runtime behaviour the user will want to exercise manually, include a **Test plan** checklist in the PR body so the user can run it whenever they review — don't block the PR on the user running it first.
 
 ### What belongs in separate PRs
 
