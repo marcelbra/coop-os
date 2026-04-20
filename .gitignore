@@ -57,14 +57,23 @@ coop_os/workspace/roles/*
 coop_os/workspace/milestones/*
 coop_os/user/notes/*
 coop_os/user/context/*
-coop_os/user/skills/*
-!coop_os/user/skills/README.md
 coop_os/workspace/tasks/*
+
+# Skills — personal by default; repo-standard skills are explicitly allowlisted
+# below. To publish a personal skill (promote it to a tracked, shipped skill),
+# add an `!coop_os/agent/skills/<slug>/` line to the allowlist and commit it.
+coop_os/agent/skills/*
+!coop_os/agent/skills/check-in/
+!coop_os/agent/skills/check-out/
+!coop_os/agent/skills/coop-session/
+!coop_os/agent/skills/scan-notes/
+!coop_os/agent/skills/weekly-review/
+!coop_os/agent/skills/workspace-setup/
 
 # Local specs (not tracked)
 specs/
 
-# Skills (local Claude Code plugin dir, not tracked — anchored to repo root
-# so it doesn't accidentally ignore coop_os/agent/skills/)
+# Local Claude Code plugin dir for installed skills (output of `make skills`).
+# Anchored to repo root so it doesn't shadow the source dir at coop_os/agent/skills/.
 /skills/
 /skills-lock.json

@@ -13,9 +13,6 @@ skills:  ## Install agent skills into .claude/skills/ (requires npx)
 		exit 1; \
 	}
 	npx --yes skills add ./coop_os/agent/skills --all
-	@if [ -d ./coop_os/user/skills ] && [ -n "$$(ls -A ./coop_os/user/skills 2>/dev/null | grep -v '^README.md$$')" ]; then \
-		npx --yes skills add ./coop_os/user/skills --all; \
-	fi
 
 lint:  ## Check for linting and type errors
 	uv run ruff check coop_os
