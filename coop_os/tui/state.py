@@ -7,7 +7,9 @@ from coop_os.backend.models import (
     Milestone,
     MilestoneStatus,
     Note,
+    Occurrence,
     ProjectState,
+    RecurringTask,
     Role,
     RoleStatus,
     Skill,
@@ -23,6 +25,8 @@ _KIND_TO_COLLECTION: dict[str, str] = {
     "role": "roles",
     "milestone": "milestones",
     "task": "tasks",
+    "recurring_task": "recurring_tasks",
+    "occurrence": "occurrences",
     "note": "notes",
     "context": "contexts",
     "skill": "skills",
@@ -106,7 +110,9 @@ class StateManager:
     def cfg(self) -> AppConfig:
         return read_config(self.root)
 
-    def item(self, nav: Nav | None) -> Role | Milestone | Task | Note | Context | Skill | None:
+    def item(
+        self, nav: Nav | None
+    ) -> Role | Milestone | Task | RecurringTask | Occurrence | Note | Context | Skill | None:
         """Look up the item for *nav* in current state."""
         if not nav or not self.state or not isinstance(nav, ContentNav):
             return None

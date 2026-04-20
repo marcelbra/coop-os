@@ -13,8 +13,11 @@ from coop_os.backend.models import (
     Context,
     Milestone,
     Note,
+    Occurrence,
+    OccurrenceStatus,
     ParseError,
     ProjectState,
+    RecurringTask,
     Role,
     Skill,
     Task,
@@ -113,6 +116,47 @@ def _collect_task_ids(search_dir: Path) -> list[str]:
             ids.append(_fm_id(desc))
         ids.extend(_collect_task_ids(d))
     return ids
+
+
+# ── Serialization helpers for the time-policy / sync / recurrence fields ─────
+
+
+def _apply_time_policy_meta(meta: dict[str, Any], item: RecurringTask | Task) -> None:
+    """Serialize time-policy-related fields into *meta*, omitting zero-value defaults."""
+    if str(item.time_policy) != "all_day":
+        meta["time_policy"] = str(item.time_policy)
+    if item.start_time:
+        meta["start_time"] = item.start_time
+    if item.duration_minutes:
+        meta["duration_minutes"] = item.duration_minutes
+    if item.timezone:
+        meta["timezone"] = item.timezone
+
+
+def _apply_recurrence_meta(meta: dict[str, Any], item: RecurringTask) -> None:
+    if item.rrule:
+        meta["rrule"] = item.rrule
+    if item.dtstart:
+        meta["dtstart"] = item.dtstart
+    if item.until:
+        meta["until"] = item.until
+    if item.exdates:
+        meta["exdates"] = list(item.exdates)
+
+
+def _apply_sync_meta(meta: dict[str, Any], item: RecurringTask | Task) -> None:
+    if item.sync_to_calendar:
+        meta["sync_to_calendar"] = True
+    if item.calendar_id:
+        meta["calendar_id"] = item.calendar_id
+    if item.calendar_event_id:
+        meta["calendar_event_id"] = item.calendar_event_id
+    if str(item.sync_state) != "none":
+        meta["sync_state"] = str(item.sync_state)
+    if item.last_synced_at:
+        meta["last_synced_at"] = item.last_synced_at
+    if item.last_synced_hash:
+        meta["last_synced_hash"] = item.last_synced_hash
 
 
 # ── Base store for flat-file entities ─────────────────────────────────────────
@@ -281,6 +325,16 @@ class TaskStore:
                         for attachment in meta.get("attachments", [])
                         if (task_dir / attachment["filename"]).exists()
                     ],
+                    time_policy=meta.get("time_policy", "all_day"),
+                    start_time=str(meta.get("start_time", "")),
+                    duration_minutes=int(meta.get("duration_minutes", 0)),
+                    timezone=str(meta.get("timezone", "")),
+                    sync_to_calendar=bool(meta.get("sync_to_calendar", False)),
+                    calendar_id=str(meta.get("calendar_id", "")),
+                    calendar_event_id=str(meta.get("calendar_event_id", "")),
+                    sync_state=meta.get("sync_state", "none"),
+                    last_synced_at=str(meta.get("last_synced_at", "")),
+                    last_synced_hash=str(meta.get("last_synced_hash", "")),
                 ))
                 self._load_from_dir(task_dir, str(meta["id"]), tasks, errors)
             except Exception as e:
@@ -321,6 +375,8 @@ class TaskStore:
             meta["parent"] = task.parent
         if task.attachments:
             meta["attachments"] = [attachment.model_dump() for attachment in task.attachments]
+        _apply_time_policy_meta(meta, task)
+        _apply_sync_meta(meta, task)
         _write_fm(task_dir / "description.md", meta, task.description)
 
     def delete(self, task_id: str) -> bool:
@@ -397,6 +453,178 @@ class ContextStore(FlatFileStore[Context]):
         return item.title
 
 
+class RecurringTaskStore(FlatFileStore[RecurringTask]):
+    def __init__(self, root: Path) -> None:
+        super().__init__(root, "workspace/recurring_tasks", "rtask", label="recurring_tasks")
+
+    def _parse(self, meta: dict[str, Any], content: str) -> RecurringTask:
+        return RecurringTask(
+            id=str(meta["id"]),
+            title=str(meta["title"]),
+            status=meta.get("status", "active"),
+            role=str(meta["role"]) if meta.get("role") else None,
+            milestone=str(meta["milestone"]) if meta.get("milestone") else None,
+            description=content,
+            time_policy=meta.get("time_policy", "all_day"),
+            start_time=str(meta.get("start_time", "")),
+            duration_minutes=int(meta.get("duration_minutes", 0)),
+            timezone=str(meta.get("timezone", "")),
+            rrule=str(meta.get("rrule", "")),
+            dtstart=str(meta.get("dtstart", "")),
+            until=str(meta.get("until", "")),
+            exdates=[str(date_str) for date_str in meta.get("exdates", [])],
+            sync_to_calendar=bool(meta.get("sync_to_calendar", False)),
+            calendar_id=str(meta.get("calendar_id", "")),
+            calendar_event_id=str(meta.get("calendar_event_id", "")),
+            sync_state=meta.get("sync_state", "none"),
+            last_synced_at=str(meta.get("last_synced_at", "")),
+            last_synced_hash=str(meta.get("last_synced_hash", "")),
+        )
+
+    def _to_meta_content(self, item: RecurringTask) -> tuple[dict[str, Any], str]:
+        meta: dict[str, Any] = {
+            "id": item.id,
+            "title": item.title,
+            "status": str(item.status),
+        }
+        if item.role:
+            meta["role"] = item.role
+        if item.milestone:
+            meta["milestone"] = item.milestone
+        _apply_time_policy_meta(meta, item)
+        _apply_recurrence_meta(meta, item)
+        _apply_sync_meta(meta, item)
+        return meta, item.description
+
+    def _file_slug(self, item: RecurringTask) -> str:
+        return item.title
+
+    def save(self, item: RecurringTask) -> None:
+        existing_items, _ = self.load_all()
+        if any(other.title == item.title and other.id != item.id for other in existing_items):
+            raise ValueError(f"A recurring task named '{item.title}' already exists.")
+        super().save(item)
+
+
+_OCC_ID_RE = re.compile(r"^occ-(rtask-\d+)-(\d{4}-\d{2}-\d{2})$")
+
+
+class OccurrenceStore:
+    """Flat per-occurrence store keyed by deterministic IDs.
+
+    IDs have the form ``occ-{rtask-id}-{YYYY-MM-DD}`` and filenames mirror the ID with
+    no title slug, which gives O(1) path lookups for ``(series, date)`` pairs and makes
+    date-range queries (used by weekly-review) cheap via filename globbing.
+    """
+
+    def __init__(self, root: Path) -> None:
+        self._dir = root / "coop_os" / "workspace" / "occurrences"
+
+    def _path_for(self, occurrence_id: str) -> Path:
+        return self._dir / f"{occurrence_id}.md"
+
+    @staticmethod
+    def build_id(recurring_task_id: str, date: str) -> str:
+        return f"occ-{recurring_task_id}-{date}"
+
+    def load_all(self) -> tuple[list[Occurrence], list[ParseError]]:
+        items: list[Occurrence] = []
+        errors: list[ParseError] = []
+        if not self._dir.exists():
+            return items, errors
+        for path in sorted(self._dir.glob("occ-*.md")):
+            try:
+                meta, content = _read_fm(path)
+                items.append(Occurrence(
+                    id=str(meta["id"]),
+                    recurring_task_id=str(meta["recurring_task_id"]),
+                    date=str(meta["date"]),
+                    status=meta.get("status", "pending"),
+                    completed_at=str(meta.get("completed_at", "")),
+                    note=content or str(meta.get("note", "")),
+                    calendar_event_instance_id=str(meta.get("calendar_event_instance_id", "")),
+                ))
+            except Exception as e:
+                errors.append(ParseError(file=f"occurrences/{path.name}", error=str(e)))
+        return items, errors
+
+    def for_series(self, recurring_task_id: str) -> list[Occurrence]:
+        occurrences, _ = self.load_all()
+        return [occurrence for occurrence in occurrences if occurrence.recurring_task_id == recurring_task_id]
+
+    def in_range(self, start: str, end: str) -> list[Occurrence]:
+        """Return occurrences with ISO date strings in ``[start, end]`` (inclusive)."""
+        occurrences, _ = self.load_all()
+        return [occurrence for occurrence in occurrences if start <= occurrence.date <= end]
+
+    def get(self, recurring_task_id: str, date: str) -> Occurrence | None:
+        path = self._path_for(self.build_id(recurring_task_id, date))
+        if not path.exists():
+            return None
+        try:
+            meta, content = _read_fm(path)
+            return Occurrence(
+                id=str(meta["id"]),
+                recurring_task_id=str(meta["recurring_task_id"]),
+                date=str(meta["date"]),
+                status=meta.get("status", "pending"),
+                completed_at=str(meta.get("completed_at", "")),
+                note=content,
+                calendar_event_instance_id=str(meta.get("calendar_event_instance_id", "")),
+            )
+        except Exception:
+            return None
+
+    def save(self, occurrence: Occurrence) -> None:
+        self._dir.mkdir(parents=True, exist_ok=True)
+        meta: dict[str, Any] = {
+            "id": occurrence.id,
+            "recurring_task_id": occurrence.recurring_task_id,
+            "date": occurrence.date,
+            "status": str(occurrence.status),
+        }
+        if occurrence.completed_at:
+            meta["completed_at"] = occurrence.completed_at
+        if occurrence.calendar_event_instance_id:
+            meta["calendar_event_instance_id"] = occurrence.calendar_event_instance_id
+        _write_fm(self._path_for(occurrence.id), meta, occurrence.note)
+
+    def upsert(
+        self,
+        recurring_task_id: str,
+        date: str,
+        status: OccurrenceStatus | str,
+        note: str = "",
+        completed_at: str = "",
+    ) -> Occurrence:
+        occurrence = Occurrence(
+            id=self.build_id(recurring_task_id, date),
+            recurring_task_id=recurring_task_id,
+            date=date,
+            status=OccurrenceStatus(str(status)),
+            completed_at=completed_at,
+            note=note,
+        )
+        self.save(occurrence)
+        return occurrence
+
+    def delete(self, item_id: str) -> bool:
+        """Remove the occurrence with the given deterministic ID, if it exists."""
+        if not _OCC_ID_RE.match(item_id):
+            return False
+        path = self._path_for(item_id)
+        if path.exists():
+            path.unlink()
+            return True
+        return False
+
+    def find_path(self, item_id: str) -> Path | None:
+        if not _OCC_ID_RE.match(item_id):
+            return None
+        path = self._path_for(item_id)
+        return path if path.exists() else None
+
+
 class SkillStore:
     def __init__(self, root: Path) -> None:
         self._dir = root / "coop_os" / "agent" / "skills"
@@ -450,17 +678,31 @@ class ProjectStore:
         self.roles = RoleStore(root)
         self.milestones = MilestoneStore(root)
         self.tasks = TaskStore(root)
+        self.recurring_tasks = RecurringTaskStore(root)
+        self.occurrences = OccurrenceStore(root)
         self.notes = NoteStore(root)
         self.contexts = ContextStore(root)
         self.skills = SkillStore(root)
 
     def store_for(
         self, kind: str
-    ) -> RoleStore | MilestoneStore | TaskStore | NoteStore | ContextStore | SkillStore | None:
+    ) -> (
+        RoleStore
+        | MilestoneStore
+        | TaskStore
+        | RecurringTaskStore
+        | OccurrenceStore
+        | NoteStore
+        | ContextStore
+        | SkillStore
+        | None
+    ):
         return {
             "role": self.roles,
             "milestone": self.milestones,
             "task": self.tasks,
+            "recurring_task": self.recurring_tasks,
+            "occurrence": self.occurrences,
             "note": self.notes,
             "context": self.contexts,
             "skill": self.skills,
@@ -470,14 +712,21 @@ class ProjectStore:
         roles, role_errs = self.roles.load_all()
         milestones, ms_errs = self.milestones.load_all()
         tasks, task_errs = self.tasks.load_all()
+        recurring_tasks, rtask_errs = self.recurring_tasks.load_all()
+        occurrences, occ_errs = self.occurrences.load_all()
         notes, note_errs = self.notes.load_all()
         contexts, ctx_errs = self.contexts.load_all()
         skills, skill_errs = self.skills.load_all()
-        errors = role_errs + ms_errs + task_errs + note_errs + ctx_errs + skill_errs
+        errors = (
+            role_errs + ms_errs + task_errs + rtask_errs + occ_errs
+            + note_errs + ctx_errs + skill_errs
+        )
         return ProjectState(
             roles=roles,
             milestones=milestones,
             tasks=tasks,
+            recurring_tasks=recurring_tasks,
+            occurrences=occurrences,
             notes=notes,
             contexts=contexts,
             skills=skills,

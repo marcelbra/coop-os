@@ -18,10 +18,32 @@ name: check-in
    - Read task files in `tasks/` with status `todo`
    - Identify what's overdue, what's closest to done, what aligns with today's energy
 
-4. **Synthesize and present**
+4. **Check today's recurring occurrences**
+   - For every `rtask-*.md` with `status: active`, compute whether today is an expected occurrence and whether an `occ-{rtask-id}-{today}.md` already exists. The Python path:
+     ```
+     uv run python -c "
+     from datetime import date
+     from pathlib import Path
+     from coop_os.backend.store import ProjectStore
+     from coop_os.backend.recurrence import expected_occurrences
+     store = ProjectStore(Path('.'))
+     state = store.load()
+     today = date.today()
+     for rt in state.recurring_tasks:
+         if rt.status != 'active':
+             continue
+         if expected_occurrences(rt, today, today):
+             existing = store.occurrences.get(rt.id, today.isoformat())
+             print(rt.id, rt.title, 'done' if existing and existing.status == 'done' else 'pending')
+     "
+     ```
+   - Surface pending occurrences in the briefing. Offer to mark done/skip inline.
+
+5. **Synthesize and present**
    - Lead with: what's the one most important thing today?
    - Surface top 3 priorities (not more)
    - Flag anything urgent from email or calendar
+   - Include today's recurring occurrences in the briefing, marked pending/done
 
-5. **Open the floor**
+6. **Open the floor**
    - End with: "What's on your mind?" or "Anything to add before we dive in?"
