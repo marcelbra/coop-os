@@ -18,6 +18,37 @@ Thumbs.db
 .claude/*
 !.claude/settings.json
 
+# AI editors / agents (auto-generated config dirs)
+.adal/
+.agents/
+.augment/
+.bob/
+.codebuddy/
+.commandcode/
+.continue/
+.cortex/
+.crush/
+.factory/
+.goose/
+.iflow/
+.junie/
+.kilocode/
+.kiro/
+.kode/
+.mcpjam/
+.mux/
+.neovate/
+.openhands/
+.pi/
+.pochi/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.vibe/
+.windsurf/
+.zencoder/
+
 # Session state (per-user, not tracked)
 .coop-os-session.json
 
@@ -31,6 +62,7 @@ coop_os/workspace/tasks/*
 # Local specs (not tracked)
 specs/
 
-# Skills (local, not tracked)
-skills/
-skills-lock.json
+# Skills (local Claude Code plugin dir, not tracked — anchored to repo root
+# so it doesn't accidentally ignore coop_os/agent/skills/)
+/skills/
+/skills-lock.json
