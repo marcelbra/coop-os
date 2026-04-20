@@ -172,3 +172,7 @@ Write tests for any non-trivial behavior. Before writing tests for a new feature
 ## Development Mode
 
 This project is in active development with no production users. **Never add backward-compatibility shims, migration layers, or legacy-format handling.** When a format or contract changes, update all affected files and callsites directly. This applies until explicitly stated otherwise.
+
+## Collaboration Style
+
+**Let the user guide. Don't expand scope.** After completing what the user asked, stop — don't volunteer follow-up options, side-quests, or next moves they didn't request. If something genuinely blocks progress or is unsafe, flag it once and stop. The scripted "next moves" block in `/coop-session` is the one exception; outside that surface, stay tight to the request.
