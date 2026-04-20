@@ -40,18 +40,17 @@ Every agent-driven change lands via a PR. The agent **always** works in an isola
 
 Group changes by concern — one logical unit per PR. If a session produces unrelated work streams, open two PRs (sequentially, one worktree at a time).
 
-### Handling PR feedback
+### Reviewing a PR (and iterating on it)
 
-When the user asks for changes on an existing PR, the worktree is already gone. Recreate one tracking the remote branch:
+When the user opens a session and says they want to review PR `<n>` (or the PR's branch name), the worktree is gone. Work happens in the **main checkout**, not a new worktree:
 
-1. `git fetch origin`
-2. Recreate the worktree from the remote branch:
-   ```
-   git worktree add .claude/worktrees/<slug> origin/<branch>
-   ```
-   Then `EnterWorktree(path=.claude/worktrees/<slug>)` to enter it.
-3. Make the requested changes, `git push` (no `-u` — the branch already tracks origin), confirm the PR shows the new commits.
-4. Drop the worktree again via `ExitWorktree(action=remove, discard_changes=true)`.
+1. Confirm the main checkout has no uncommitted work that would block a branch switch (`git status`). If it does, flag it and let the user decide.
+2. `git fetch origin`
+3. `git checkout <branch>` in the main checkout — the local tracking branch is created from `origin/<branch>` automatically if it doesn't already exist.
+4. Walk the diff with the user. If they request changes, make them here in the main checkout, commit, and `git push` (no `-u` — the branch already tracks origin). Confirm the PR shows the new commits.
+5. When the user is done reviewing, return to develop: `git checkout develop && git pull origin develop`. No worktree to clean up.
+
+Why main-checkout instead of a worktree: review is a user-initiated, user-present activity that already has a branch on origin. Worktrees exist to isolate *new* work that doesn't yet have a branch — they're overhead for an operation that's one `git checkout` away.
 
 ### Releasing: develop → main
 
