@@ -10,7 +10,8 @@ name: scan-notes
    - If none found, say so and stop
 
 2. **For each unscanned note**, analyze the content and identify what actions make sense:
-   - **Create task** — something specific to do (include suggested title, milestone, labels)
+   - **Create task** — something specific to do with a due date or finite scope (include suggested title, milestone, labels)
+   - **Create recurring task** — the note describes a cadence (words like *every*, *weekly*, *daily*, *×/week*, *monthly*). Propose an RRULE and a milestone link.
    - **Create milestone** — a new multi-month goal area emerging
    - **No action** — just informational, archive as-is
 
@@ -23,6 +24,7 @@ name: scan-notes
    - Draft → confirm → write → validate (hook auto-runs `uv run coop-os validate`)
    - Tasks live at `tasks/task-{n}-{title}/description.md`
    - Milestones live at `milestones/milestone-{n}-{title}.md`
+   - Recurring tasks live at `recurring_tasks/rtask-{n}-{title}.md` with an `rrule` (e.g. `FREQ=WEEKLY;BYDAY=MO`), `dtstart`, and `milestone` link
    - Use the typed-ID format and valid status enums documented in `AGENT.md`
 
 5. **Mark notes as scanned**

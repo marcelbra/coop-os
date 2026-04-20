@@ -14,7 +14,9 @@ def truncate_label(s: str) -> str:
     return s if len(s) <= _LABEL_MAX else s[: _LABEL_MAX - 1] + "…"
 
 
-ContentKind = Literal["role", "milestone", "task", "note", "context", "skill"]
+ContentKind = Literal[
+    "role", "milestone", "task", "recurring_task", "occurrence", "note", "context", "skill",
+]
 FileKind = Literal["agent", "task_file", "task_dir"]
 StructKind = Literal["section", "root", "header", "sep"]
 
@@ -23,7 +25,7 @@ StructKind = Literal["section", "root", "header", "sep"]
 class ContentNav:
     kind: ContentKind
     id: str    # entity ID, e.g. "task-1"
-    section: str  # "roles" | "milestones" | "tasks" | "notes" | "contexts" | "skills"
+    section: str  # e.g. "roles" | "milestones" | "tasks" | "recurring" | "notes" | ...
 
 
 @dataclass
@@ -51,7 +53,7 @@ def is_content_nav(nav: Nav) -> bool:
 
 def nav_from_parts(kind: str, id_or_path: str, section: str) -> Nav:
     """Reconstruct a Nav from its serialized string parts (used for session restore)."""
-    if kind in ("role", "milestone", "task", "note", "context", "skill"):
+    if kind in ("role", "milestone", "task", "recurring_task", "occurrence", "note", "context", "skill"):
         return ContentNav(kind, id_or_path, section)
     if kind in ("agent", "task_file", "task_dir"):
         return FileNav(kind, Path(id_or_path))

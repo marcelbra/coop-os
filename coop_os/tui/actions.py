@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import shutil
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -12,6 +12,10 @@ from coop_os.backend.models import (
     Milestone,
     MilestoneStatus,
     Note,
+    Occurrence,
+    OccurrenceStatus,
+    RecurringTask,
+    RecurringTaskStatus,
     Role,
     RoleStatus,
     Skill,
@@ -52,7 +56,9 @@ class _CoopOSHost(_HostBase):
     # CoopOSApp helpers
     def _sync_state(self) -> None: ...
     def _reload(self) -> None: ...
-    def _item(self) -> Role | Milestone | Task | Note | Context | Skill | None: ...
+    def _item(
+        self,
+    ) -> Role | Milestone | Task | RecurringTask | Occurrence | Note | Context | Skill | None: ...
     def _show_edit(self, select_all: bool = False) -> None: ...
     def _show_view(self) -> Worker[None]: ...
     def _update_right_hints(self) -> None: ...
@@ -101,6 +107,14 @@ def _unique_default_title(prefix: str, starting_n: int, existing_titles: set[str
     return f"{prefix} {n}"
 
 
+_OCCURRENCE_TOGGLE_CYCLE: dict[str, OccurrenceStatus] = {
+    "pending": OccurrenceStatus.DONE,
+    "done": OccurrenceStatus.SKIPPED,
+    "skipped": OccurrenceStatus.PENDING,
+    "missed": OccurrenceStatus.DONE,
+}
+
+
 class ActionsMixin(_CoopOSHost):
     """CRUD and filter actions for CoopOSApp.
 
@@ -133,7 +147,7 @@ class ActionsMixin(_CoopOSHost):
         section = self._selected_section()
 
         today = date.today().isoformat()
-        new_item: Role | Milestone | Task | Note | Context | Skill
+        new_item: Role | Milestone | Task | RecurringTask | Note | Context | Skill
 
         match section:
             case "roles":
@@ -171,6 +185,22 @@ class ActionsMixin(_CoopOSHost):
                 )
                 self.sm.store.tasks.save(new_item)
                 selected = ContentNav("task", new_item.id, "tasks")
+            case "recurring":
+                new_id = self.sm.store.recurring_tasks.next_id()
+                rtask_title = _unique_default_title(
+                    "Recurring",
+                    int(new_id.rsplit("-", 1)[-1]),
+                    {rt.title for rt in self.sm.state.recurring_tasks},
+                )
+                new_item = RecurringTask(
+                    id=new_id,
+                    title=rtask_title,
+                    status=RecurringTaskStatus.ACTIVE,
+                    rrule="FREQ=WEEKLY",
+                    dtstart=today,
+                )
+                self.sm.store.recurring_tasks.save(new_item)
+                selected = ContentNav("recurring_task", new_item.id, "recurring")
             case "contexts":
                 new_id = self.sm.store.contexts.next_id()
                 new_item = Context(id=new_id, title=f"Context {new_id.rsplit('-', 1)[-1]}")
@@ -383,3 +413,77 @@ class ActionsMixin(_CoopOSHost):
     @work
     async def action_filter_tasks(self: _CoopOSHost) -> None:
         await self._open_filter("Filter Tasks", TaskStatus, self.sm.task_filters, "task_filters", dismiss_key="t")
+
+    # ── Occurrences ───────────────────────────────────────────────────────────
+
+    def action_toggle_occurrence(self: _CoopOSHost) -> None:
+        """Cycle the currently-selected occurrence through pending→done→skipped→pending.
+
+        Also recognised when the cursor is on a RecurringTask row: creates or cycles
+        today's occurrence for that series, so hitting space on the series row is the
+        fast path for "mark today done".
+        """
+        content = self.query_one(ContentPanel)
+        if content.is_editing or not self.sm.state or not self.selected:
+            return
+        if not isinstance(self.selected, ContentNav):
+            return
+        store = self.sm.store.occurrences
+        if self.selected.kind == "occurrence":
+            existing = next(
+                (occurrence for occurrence in self.sm.state.occurrences if occurrence.id == self.selected.id),
+                None,
+            )
+            if existing is None:
+                return
+            next_status = _OCCURRENCE_TOGGLE_CYCLE.get(str(existing.status), OccurrenceStatus.DONE)
+            completed_at = datetime.now().isoformat(timespec="seconds") if next_status == OccurrenceStatus.DONE else ""
+            store.upsert(
+                existing.recurring_task_id,
+                existing.date,
+                next_status,
+                note=existing.note,
+                completed_at=completed_at,
+            )
+            self._reload()
+            return
+        if self.selected.kind == "recurring_task":
+            today = date.today().isoformat()
+            existing = store.get(self.selected.id, today)
+            if existing is None:
+                store.upsert(
+                    self.selected.id,
+                    today,
+                    OccurrenceStatus.DONE,
+                    completed_at=datetime.now().isoformat(timespec="seconds"),
+                )
+                self._reload()
+                self.notify(f"Marked {today} done", severity="information", timeout=2)
+                return
+            next_status = _OCCURRENCE_TOGGLE_CYCLE.get(str(existing.status), OccurrenceStatus.DONE)
+            completed_at = datetime.now().isoformat(timespec="seconds") if next_status == OccurrenceStatus.DONE else ""
+            store.upsert(
+                existing.recurring_task_id,
+                existing.date,
+                next_status,
+                note=existing.note,
+                completed_at=completed_at,
+            )
+            self._reload()
+
+    def action_complete_today(self: _CoopOSHost) -> None:
+        """Create or mark-done today's occurrence for the selected recurring task."""
+        content = self.query_one(ContentPanel)
+        if content.is_editing or not self.sm.state or not self.selected:
+            return
+        if not isinstance(self.selected, ContentNav) or self.selected.kind != "recurring_task":
+            return
+        today = date.today().isoformat()
+        self.sm.store.occurrences.upsert(
+            self.selected.id,
+            today,
+            OccurrenceStatus.DONE,
+            completed_at=datetime.now().isoformat(timespec="seconds"),
+        )
+        self._reload()
+        self.notify(f"Marked {today} done", severity="information", timeout=2)

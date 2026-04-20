@@ -11,13 +11,29 @@ from textual.widget import Widget
 from textual.widgets import Label, Rule
 
 from coop_os.backend.models import ProjectState
-from coop_os.backend.schema import BODY_ATTR, DATE_FIELDS, FIELD_DEFS, SELECT_FIELDS
+from coop_os.backend.schema import (
+    BODY_ATTR,
+    BOOL_FIELDS,
+    DATE_FIELDS,
+    FIELD_DEFS,
+    INT_FIELDS,
+    LIST_FIELDS,
+    SELECT_FIELDS,
+    TIME_FIELDS,
+)
 from coop_os.tui.widgets.body_text_area import BodyTextArea
 from coop_os.tui.widgets.calendar import CalendarWidget
-from coop_os.tui.widgets.config import SCANNED_ICONS, AppConfig
+from coop_os.tui.widgets.config import (
+    SCANNED_ICONS,
+    SYNC_STATE_ICONS,
+    SYNC_TO_CALENDAR_ICONS,
+    TIME_POLICY_ICONS,
+    AppConfig,
+)
 from coop_os.tui.widgets.date_field_input import DateFieldInput
 from coop_os.tui.widgets.field_input import FieldInput
 from coop_os.tui.widgets.select_input import SelectInput
+from coop_os.tui.widgets.time_field_input import TimeFieldInput
 
 
 class StructuredEditor(Widget):
@@ -43,7 +59,12 @@ class StructuredEditor(Widget):
                 if attr_key in SELECT_FIELDS:
                     yield SelectInput(id=f"se-inp-{attr_key}")
                 else:
-                    cls = DateFieldInput if attr_key in DATE_FIELDS else FieldInput
+                    if attr_key in DATE_FIELDS:
+                        cls: type[FieldInput] = DateFieldInput
+                    elif attr_key in TIME_FIELDS:
+                        cls = TimeFieldInput
+                    else:
+                        cls = FieldInput
                     yield cls(id=f"se-inp-{attr_key}", disabled=readonly)
         yield Rule(classes="se-sep", id="se-sep")
         yield BodyTextArea("", id="se-body", language="markdown", theme="vscode_dark")
@@ -129,6 +150,26 @@ class StructuredEditor(Widget):
             return ""
         return str(raw)
 
+    @staticmethod
+    def _status_icons_for(kind: str, cfg: AppConfig) -> dict[str, str]:
+        """Return the status-icon mapping for *kind* (falls back to milestone_statuses)."""
+        if kind == "task":
+            return cfg.task_statuses
+        if kind == "role":
+            return cfg.role_statuses
+        if kind == "recurring_task":
+            return cfg.recurring_task_statuses
+        if kind == "occurrence":
+            return cfg.occurrence_statuses
+        return cfg.milestone_statuses
+
+    _ICON_SELECTS: dict[str, dict[str, str]] = {
+        "time_policy": TIME_POLICY_ICONS,
+        "sync_to_calendar": SYNC_TO_CALENDAR_ICONS,
+        "sync_state": SYNC_STATE_ICONS,
+        "scanned": SCANNED_ICONS,
+    }
+
     def _build_select_options(
         self,
         attr_key: str,
@@ -139,32 +180,23 @@ class StructuredEditor(Widget):
         milestone_ids: list[str],
         milestone_titles: list[str],
     ) -> tuple[list[str], list[str] | None]:
-        """Build options and optional display labels for a select field.
+        """Build options and display labels for a select field.
 
         For role and milestone fields, option values are IDs (what gets persisted to
         disk) while display labels are titles (what the user sees). IDs are stable
         across renames; titles are not.
         """
-        display: list[str] | None = None
         if attr_key == "status":
-            if kind == "task":
-                icons = cfg.task_statuses
-            elif kind == "role":
-                icons = cfg.role_statuses
-            else:
-                icons = cfg.milestone_statuses
-            options: list[str] = list(icons.keys())
-            display = [f"{icons[s]} {s}" for s in options]
-        elif attr_key == "role":
-            options = [""] + role_ids
-            display = [""] + role_titles
-        elif attr_key == "milestone":
-            options = [""] + milestone_ids
-            display = [""] + milestone_titles
-        else:  # scanned
-            options = list(SCANNED_ICONS.keys())
-            display = [f"{SCANNED_ICONS[s]} {s}" for s in options]
-        return options, display
+            icons = self._status_icons_for(kind, cfg)
+            options = list(icons.keys())
+            return options, [f"{icons[option]} {option}" for option in options]
+        if attr_key == "role":
+            return [""] + role_ids, [""] + role_titles
+        if attr_key == "milestone":
+            return [""] + milestone_ids, [""] + milestone_titles
+        icons = self._ICON_SELECTS[attr_key]
+        options = list(icons.keys())
+        return options, [f"{icons[option]} {option}" for option in options]
 
     def set_editable(self, editable: bool) -> None:
         """Toggle between view (read-only) and edit mode for non-readonly fields."""
@@ -290,8 +322,15 @@ class StructuredEditor(Widget):
             widget = self.query_one(f"#se-inp-{attr_key}")
             fi = cast(FieldInput, widget)
             val_str = fi.value.strip()
-            if attr_key == "scanned":
+            if attr_key in BOOL_FIELDS:
                 meta[attr_key] = val_str.lower() in ("true", "yes", "1")
+            elif attr_key in INT_FIELDS:
+                try:
+                    meta[attr_key] = int(val_str) if val_str else 0
+                except ValueError:
+                    meta[attr_key] = 0
+            elif attr_key in LIST_FIELDS:
+                meta[attr_key] = [token.strip() for token in val_str.split(",") if token.strip()]
             else:
                 meta[attr_key] = val_str
         body = self.query_one("#se-body", BodyTextArea).text

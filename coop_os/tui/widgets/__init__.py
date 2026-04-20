@@ -12,6 +12,7 @@ from coop_os.tui.widgets.select_input import SelectInput
 from coop_os.tui.widgets.split_footer import SplitFooter
 from coop_os.tui.widgets.structured_editor import StructuredEditor
 from coop_os.tui.widgets.text_area import DetailTextArea
+from coop_os.tui.widgets.time_field_input import TimeFieldInput
 
 __all__ = [
     "AppConfig",
@@ -27,5 +28,6 @@ __all__ = [
     "SplitFooter",
     "SelectInput",
     "StructuredEditor",
+    "TimeFieldInput",
     "read_config",
 ]

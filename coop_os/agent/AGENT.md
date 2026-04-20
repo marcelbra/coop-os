@@ -20,6 +20,8 @@ You operate on the coop-os file system. Read and write files according to the st
 | `coop_os/workspace/roles/` | One file per life role |
 | `coop_os/workspace/milestones/` | Active and completed milestones |
 | `coop_os/workspace/tasks/` | Task folders — `{id}-{title}/description.md` each |
+| `coop_os/workspace/recurring_tasks/` | Typed recurring-task series — `rtask-{n}-{title}.md` each |
+| `coop_os/workspace/occurrences/` | Per-occurrence records — `occ-{rtask-id}-{YYYY-MM-DD}.md` each |
 | `coop_os/user/notes/` | Raw notes pending review |
 | `coop_os/user/context/` | Personal context documents |
 | `coop_os/agent/skills/` | Skill definitions — what this agent can do |
@@ -30,7 +32,7 @@ You operate on the coop-os file system. Read and write files according to the st
 
 All files in `coop_os/workspace/` are Markdown with YAML frontmatter. A `PostToolUse` hook runs `uv run coop-os validate` after every `Write`/`Edit` — if it flags an error, fix the file before moving on.
 
-**IDs are typed with a prefix**: `role-1`, `milestone-3`, `task-7`, `note-2`, `context-4`. The next id for a new item is `prefix-(max_existing_number + 1)`.
+**IDs are typed with a prefix**: `role-1`, `milestone-3`, `task-7`, `rtask-2`, `note-2`, `context-4`. The next id for a new item is `prefix-(max_existing_number + 1)`. Occurrences are a special case: their IDs are deterministic (`occ-{rtask-id}-{YYYY-MM-DD}`), not monotonic.
 
 **Filenames** follow `{id}-{title}.md` (tasks use a directory: `{id}-{title}/description.md`). The `title` portion preserves case, spaces, and most punctuation, e.g. `role-2-Health & Nutrition.md`.
 
@@ -39,7 +41,8 @@ All files in `coop_os/workspace/` are Markdown with YAML frontmatter. A `PostToo
 - **Role** — values, principles, long-term direction. *Not* operational state, blockers, time budgets, or weekly cadence.
 - **Milestone** — a discrete outcome with a deadline. *Not* open-ended maintenance or recurring work.
 - **Task** — actionable, granular work that moves a specific milestone forward.
-- **Recurring habits** — weekly/monthly loops; today a freeform file (`context-3-Recurring habits.md`), later a typed `Habit` entity linking each habit to both a role *and* a milestone. Not milestones themselves.
+- **Recurring task** — typed weekly/monthly loop with an iCal RRULE, optional Google Calendar sync, and per-occurrence completion tracking. Every recurring task is also assigned to a milestone. Replaces the former freeform `context-3-Recurring habits.md`.
+- **Occurrence** — a single dated instance of a recurring task, tracking done/skipped/missed. Not manually authored; created on completion (via the TUI `space`/`c` keys) or retroactively by `weekly-review`.
 - **Note** — raw capture, pre-scan. Meeting notes, ad-hoc thoughts, triage material.
 - **Context** — background the agent uses to stay grounded. Today overloaded to also hold user documents (CV, brainstorms) — proper Document type tracked in `context-2` as a feature.
 
@@ -73,8 +76,42 @@ Body = description.
 | `status` | enum | `todo` \| `in_progress` \| `waiting` \| `done` \| `cancelled` |
 | `milestone` | str \| null | references `milestone-{n}` |
 | `parent` | str \| null | ignored on load — directory nesting is authoritative |
+| `time_policy` | enum | `all_day` (default) \| `timed` — determines whether a synced event is all-day or a block |
+| `start_time` / `duration_minutes` / `timezone` | str / int / str | required when `time_policy == timed` (HH:MM, > 0, IANA zone) |
+| `sync_to_calendar` | bool | opt-in (default `false`); if `true`, a Calendar event is created on next `calendar-sync` |
+| `calendar_id` / `calendar_event_id` / `sync_state` / `last_synced_at` / `last_synced_hash` | str | sync bookkeeping — do not edit by hand |
 
 Body = description.
+
+### RecurringTask — `workspace/recurring_tasks/rtask-{n}-{title}.md`
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | str | `rtask-{n}` |
+| `title` | str | |
+| `status` | enum | `active` (default) \| `paused` \| `archived` |
+| `role` / `milestone` | str \| null | links — milestone is the primary feed |
+| `time_policy` | enum | `all_day` (default) \| `timed` — mirrors Task |
+| `start_time` / `duration_minutes` / `timezone` | str / int / str | required when `time_policy == timed` |
+| `rrule` | str | iCal RRULE body, e.g. `FREQ=WEEKLY;BYDAY=MO,WE` — no `RRULE:` prefix |
+| `dtstart` | str | series anchor, ISO `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM` |
+| `until` | str | optional series end — must be ≥ `dtstart` |
+| `exdates` | list[str] | explicit skipped dates (ISO) — mirrors EXDATE |
+| `sync_to_calendar` | bool | opt-in; on sync produces a recurring Google Calendar event |
+| `calendar_id` / `calendar_event_id` / `sync_state` / `last_synced_at` / `last_synced_hash` | str | sync bookkeeping — do not edit by hand |
+
+Body = description.
+
+### Occurrence — `workspace/occurrences/occ-{rtask-id}-{YYYY-MM-DD}.md`
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | str | `occ-{rtask-id}-{YYYY-MM-DD}` — deterministic, not monotonic |
+| `recurring_task_id` | str | parent `rtask-{n}` |
+| `date` | str | ISO `YYYY-MM-DD` — the series-local date |
+| `status` | enum | `pending` \| `done` \| `skipped` \| `missed` |
+| `completed_at` | str | ISO-8601 timestamp when marked done |
+| `calendar_event_instance_id` | str | Google Calendar instance reference (optional, populated by sync) |
+
+Body = free-text note about the occurrence (optional).
 
 ### Note — `workspace/../user/notes/note-{n}-{title}.md`
 | Field | Type | Notes |
@@ -144,7 +181,8 @@ Skills live in `coop_os/agent/skills/`. Invoke the relevant skill when the user'
 | `check-in` | User wants to start their day, review priorities, or get a morning briefing |
 | `check-out` | User wants to wrap up the day, review progress, or plan tomorrow |
 | `weekly-review` | User wants a full week retrospective or to plan the coming week |
-| `scan-notes` | User wants to process raw notes into tasks or milestones |
+| `scan-notes` | User wants to process raw notes into tasks, recurring tasks, or milestones |
+| `calendar-sync` | User wants to push coop-os tasks and recurring tasks to Google Calendar and reconcile skips/reschedules |
 | `workspace-setup` | Workspace directories are empty or user wants to import existing context |
 
 ---
@@ -161,8 +199,8 @@ At the start of every session (unless a skill is triggered immediately):
 6. **Check notes** — if any unprocessed files exist in `coop_os/user/notes/`, flag them as pending (suggest `scan-notes`)
 7. **Handle empty workspace** — if `coop_os/workspace/` has no roles, milestones, or tasks, skip the snapshot and offer to run `workspace-setup` instead
 8. **Present status snapshot** — produce a rich overview the user can orient from cold:
-   - **Workspace** — counts: roles · milestones (active / completed) · tasks · contexts
-   - **Recurring habits** — coverage (which roles have habits, which are gaps)
+   - **Workspace** — counts: roles · milestones (active / completed) · tasks · recurring · contexts
+   - **Recurring coverage** — which roles have recurring tasks, which are gaps; recent done/skipped/missed from occurrences
    - **Due in the next ~30 days** — milestones ordered by `end_date`
    - **⚠ Past-dated items** — any `end_date` already in the past (needs decision: completed, cancelled, or rescheduled)
    - **Pending notes** — count of `scanned: false` in `user/notes/`

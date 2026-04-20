@@ -15,3 +15,17 @@ milestone_statuses:
 role_statuses:
   active: "◆"
   inactive: "◇"
+
+recurring_task_statuses:
+  active: "•"
+  paused: "»"
+  archived: "✗"
+
+occurrence_statuses:
+  pending: "○"
+  done: "✓"
+  skipped: "»"
+  missed: "!"
+
+# Default IANA timezone used when a recurring task or task omits one.
+workspace_timezone: Europe/Amsterdam

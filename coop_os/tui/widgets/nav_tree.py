@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date, timedelta
 from pathlib import Path
 from typing import NamedTuple
 
@@ -10,7 +11,8 @@ from textual.message import Message
 from textual.widgets import Tree
 from textual.widgets._tree import TreeNode
 
-from coop_os.backend.models import ProjectState, Task
+from coop_os.backend.models import Occurrence, ProjectState, Task
+from coop_os.backend.recurrence import summarize
 from coop_os.tui.nav import (
     ContentNav,
     FileNav,
@@ -133,7 +135,7 @@ class NavTree(Tree[Nav | None]):
 
     # ── Expand/collapse icon updates ──────────────────────────────────────
 
-    _WORKSPACE_SECTIONS = ("roles", "milestones", "tasks")
+    _WORKSPACE_SECTIONS = ("roles", "milestones", "tasks", "recurring")
 
     @staticmethod
     def _require_nav(node: TreeNode[Nav | None]) -> Nav:
@@ -379,6 +381,51 @@ class NavTree(Tree[Nav | None]):
                 data=ContentNav("milestone", m.id, "milestones"),
             )
 
+    def _add_recurring_section(
+        self,
+        expanded: set[str],
+        state: ProjectState,
+        cfg: AppConfig,
+    ) -> None:
+        """Render the Recurring section with each series and its last-7-days occurrences."""
+        today = date.today()
+        window_start = today - timedelta(days=6)
+        occurrences_by_series: dict[str, list[Occurrence]] = {}
+        for occurrence in state.occurrences:
+            occurrences_by_series.setdefault(occurrence.recurring_task_id, []).append(occurrence)
+
+        recurring_expand = "recurring" in expanded and bool(state.recurring_tasks)
+        recurring_node = self.root.add(
+            self._section_label("▼" if recurring_expand else "▶", "Recurring", False),
+            data=StructuralNav("section", "recurring"),
+            expand=recurring_expand,
+        )
+        for rtask in state.recurring_tasks:
+            icon = cfg.recurring_task_statuses.get(rtask.status, "•")
+            rule_summary = summarize(rtask.rrule)
+            label_text = f"{icon} {rtask.title}"
+            if rule_summary:
+                label_text = f"{label_text} — {rule_summary}"
+            series_occurrences = sorted(
+                (
+                    occurrence for occurrence in occurrences_by_series.get(rtask.id, [])
+                    if window_start.isoformat() <= occurrence.date <= today.isoformat()
+                ),
+                key=lambda occurrence: occurrence.date,
+                reverse=True,
+            )
+            nav = ContentNav("recurring_task", rtask.id, "recurring")
+            if series_occurrences:
+                branch = recurring_node.add(truncate_label(label_text), data=nav, expand=False)
+                for occurrence in series_occurrences:
+                    occ_icon = cfg.occurrence_statuses.get(occurrence.status, "·")
+                    branch.add_leaf(
+                        truncate_label(f"{occ_icon} {occurrence.date}"),
+                        data=ContentNav("occurrence", occurrence.id, "recurring"),
+                    )
+            else:
+                recurring_node.add_leaf(truncate_label(label_text), data=nav)
+
     def _add_tasks_section(
         self,
         expanded: set[str],
@@ -431,6 +478,7 @@ class NavTree(Tree[Nav | None]):
         self._add_tasks_section(
             expanded, state, cfg, task_filters, expanded_tasks, expanded_dirs, task_dirs, ms_ids_for_tasks
         )
+        self._add_recurring_section(expanded, state, cfg)
 
     def populate(
         self,

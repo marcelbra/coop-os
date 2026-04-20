@@ -25,6 +25,8 @@ from coop_os.backend.models import (
     Context,
     Milestone,
     Note,
+    Occurrence,
+    RecurringTask,
     Role,
     Skill,
     Task,
@@ -53,6 +55,7 @@ _SECTION_TO_KIND: dict[str, str] = {
     "roles": "role",
     "milestones": "milestone",
     "tasks": "task",
+    "recurring": "recurring_task",
     "notes": "note",
     "contexts": "context",
     "skills": "skill",
@@ -80,6 +83,8 @@ class CoopOSApp(ActionsMixin, App[None]):
         Binding("k", "show_keybindings", "keys", show=False),
         Binding("ctrl+t", "toggle_sidebar", "sidebar", show=False),
         Binding("ctrl+s", "save_file", "save", show=False),
+        Binding("space", "toggle_occurrence", "toggle", show=False),
+        Binding("c", "complete_today", "complete today", show=False),
     ]
 
     def __init__(self, root: Path) -> None:
@@ -216,7 +221,9 @@ class CoopOSApp(ActionsMixin, App[None]):
         """Public reload entry point that preserves cursor and selection."""
         self._reload()
 
-    def _item(self) -> Role | Milestone | Task | Note | Context | Skill | None:
+    def _item(
+        self,
+    ) -> Role | Milestone | Task | RecurringTask | Occurrence | Note | Context | Skill | None:
         return self.sm.item(self.selected)
 
     def _item_path(self) -> Path | None:
